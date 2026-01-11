@@ -21,6 +21,7 @@
             --edit-color: #3498db;
             --danger-color: #e74c3c;
             --success-color: #27ae60;
+            --load-color: #f39c12; /* Barva pro nové tlačítko načtení */
         }
 
         body {
@@ -182,6 +183,9 @@
         .btn.btn-update { background-color: var(--edit-color); }
         .btn-cancel-edit { background-color: #95a5a6; margin-top: 10px; display: none; }
         
+        .btn-load { background-color: var(--load-color); margin-bottom: 15px; margin-top: 0; }
+        .btn-load:hover { background-color: #d35400; }
+        
         /* Nová tlačítka pro zálohu - větší */
         .btn-backup-large { 
             background-color: #fff; color: var(--primary-color); border: 2px solid var(--primary-color); 
@@ -281,6 +285,8 @@
             </div>
 
             <div class="card" id="mainCard">
+                <button type="button" class="btn btn-load" onclick="manualLoadLast()">↺ Načíst poslední konfiguraci</button>
+                
                 <form id="archeryForm">
                     <input type="hidden" id="editId">
 
@@ -575,339 +581,21 @@
 </div>
 
 <script>
-    // --- MENU & VIEW LOGIC ---
-    function toggleMenu() {
-        const menu = document.getElementById('navDropdown');
-        menu.classList.toggle('active');
-    }
-
-    // Close menu when clicking outside
-    document.addEventListener('click', function(event) {
-        const menu = document.getElementById('navDropdown');
-        const hamburger = document.querySelector('.hamburger-btn');
-        if (!menu.contains(event.target) && !hamburger.contains(event.target)) {
-            menu.classList.remove('active');
-        }
-    });
-
-    function switchView(viewName, linkElement) {
-        // Hide all views
-        document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active-view'));
-        
-        // Show target view
-        document.getElementById('view-' + viewName).classList.add('active-view');
-        
-        // Update active link state
-        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active-link'));
-        if(linkElement) linkElement.classList.add('active-link');
-        
-        // Close menu
-        document.getElementById('navDropdown').classList.remove('active');
-        
-        // Calculate stats if opening stats view
-        if(viewName === 'stats') {
-            renderStats();
-        }
-    }
+    // --- GLOBAL HELPER FUNCTIONS (Pro sdílení mezi Editací, Načtením historie a Defaultem) ---
     
-    // --- STATS CALCULATION ---
-    function renderStats() {
-        const entries = getEntries();
-        const container = document.getElementById('statsContent');
-        
-        if(!entries.length) {
-            container.innerHTML = '<div style="text-align:center; padding:30px; color:#777;">Zatím nejsou k dispozici žádná data pro statistiku.</div>';
-            return;
-        }
-        
-        // 1. Weekly Volume
-        const now = new Date();
-        const startOfWeek = new Date(now);
-        startOfWeek.setDate(now.getDate() - now.getDay() + (now.getDay() === 0 ? -6 : 1)); // Monday
-        startOfWeek.setHours(0,0,0,0);
-        
-        const startOfLastWeek = new Date(startOfWeek);
-        startOfLastWeek.setDate(startOfLastWeek.getDate() - 7);
-        
-        let thisWeekArrows = 0;
-        let lastWeekArrows = 0;
-        
-        entries.forEach(e => {
-            const d = new Date(e.date);
-            const arrows = parseInt(e.arrowCount) || 0;
-            if(d >= startOfWeek) thisWeekArrows += arrows;
-            else if(d >= startOfLastWeek && d < startOfWeek) lastWeekArrows += arrows;
-        });
-        
-        let trend = '';
-        if(thisWeekArrows > lastWeekArrows) trend = '<span class="trend-up">⬆️</span>';
-        else if(thisWeekArrows < lastWeekArrows) trend = '<span class="trend-down">⬇️</span>';
-        else trend = '<span>➡️</span>';
-        
-        // 2. String Odometer
-        const currentString = entries[0].stringInfo || 'Neuvedeno';
-        let stringCount = 0;
-        for(let e of entries) {
-            if(e.stringInfo === currentString) stringCount += (parseInt(e.arrowCount) || 0);
-            else break; // Stop when string name changes
-        }
-        
-        // 3. BH Check
-        let bhAlert = '';
-        if(entries.length >= 2) {
-            const cur = entries[0];
-            const prev = entries[1];
-            if(cur.braceHeight && prev.braceHeight && cur.braceHeightUnit === prev.braceHeightUnit) {
-                const diff = Math.abs(parseFloat(cur.braceHeight) - parseFloat(prev.braceHeight));
-                // Threshold: 0.2 cm/inch or 2 mm
-                const threshold = cur.braceHeightUnit === 'mm' ? 2 : 0.2;
-                if(diff >= threshold) {
-                    bhAlert = `<div class="alert-box">⚠️ <strong>Změna BH!</strong> Tvé předpětí se změnilo o ${diff.toFixed(1)} ${cur.braceHeightUnit} oproti minulému tréninku. Zkontroluj protažení tětivy.</div>`;
-                }
-            }
-        }
-        
-        // 4. Avg Sight 70m
-        let sum70 = 0;
-        let count70 = 0;
-        entries.forEach(e => {
-            if(parseInt(e.distance) === 70 && e.sightElevation) {
-                // Try to parse "5.2" or "5,2"
-                let val = parseFloat(e.sightElevation.replace(',','.'));
-                if(!isNaN(val)) {
-                    sum70 += val;
-                    count70++;
-                }
-            }
-        });
-        const avg70 = count70 > 0 ? (sum70 / count70).toFixed(2) : '-';
-
-        // HTML Output
-        container.innerHTML = `
-            <div class="stat-grid">
-                <div class="stat-card">
-                    <div class="stat-header">Objem (Tento týden)</div>
-                    <div class="stat-value-big">${thisWeekArrows} ${trend}</div>
-                    <div class="stat-subtext">Minulý týden: ${lastWeekArrows}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-header">Tětiva (Odometer)</div>
-                    <div class="stat-value-big">${stringCount}</div>
-                    <div class="stat-subtext">${currentString}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-header">Průměrná Mířidla (70m)</div>
-                    <div class="stat-value-big">${avg70}</div>
-                    <div class="stat-subtext">Zprůměrováno z ${count70} záznamů</div>
-                </div>
-            </div>
-            ${bhAlert}
-        `;
-    }
-
-    // --- EXISTING APP LOGIC ---
-    const form = document.getElementById('archeryForm');
-    const entriesList = document.getElementById('entriesList');
-    const sightTableBody = document.getElementById('sightTableBody');
-    const submitBtn = document.getElementById('submitBtn');
-    const cancelEditBtn = document.getElementById('cancelEditBtn');
-    const mainCard = document.getElementById('mainCard');
-    const editIdInput = document.getElementById('editId');
-    const archerNameInput = document.getElementById('archerName');
-    const archerBowTypeInput = document.getElementById('bowType');
-    const mainTitle = document.getElementById('mainTitle');
-
-    const STORAGE_KEY_DATA = 'elite_archery_log_v16'; 
-    const TRACKED_DISTANCES = [5, 10, 15, 18, 20, 25, 30, 40, 50, 60, 70, 90];
-
-    document.addEventListener('DOMContentLoaded', () => {
-        // Načte data, nastaví "teď" a vypočítá hodnoty
-        loadDefaults(); 
-        setNow(); 
-        renderEntries(); 
-        updateTitle(); 
-        calcWeights(); 
-        calcAMO();
-        
-        document.addEventListener('input', e => { 
-            if(e.target.classList.contains('weight-input')) calcWeights();
-            if(e.target.classList.contains('draw-calc-input')) calcAMO();
-        });
-        document.addEventListener('change', e => { 
-            if(e.target.classList.contains('weight-input') || e.target.classList.contains('comp-ratio')) calcWeights(); 
-            if(e.target.classList.contains('draw-calc-input')) calcAMO();
-        });
-    });
-
-    archerNameInput.addEventListener('input', updateTitle);
-    archerBowTypeInput.addEventListener('change', updateTitle);
-
-    function updateTitle() {
-        const name = archerNameInput.value.trim();
-        const divAbbr = archerBowTypeInput.value; 
-        mainTitle.textContent = name ? `${name} (${divAbbr}) - Archery Log` : "Archery Log";
-    }
-
-    function setNow() {
-        const now = new Date();
-        document.getElementById('date').valueAsDate = now;
-        document.getElementById('time').value = now.toTimeString().substring(0,5);
-    }
-    
-    // --- DRAW LENGTH CALCULATOR ---
-    window.calcAMO = function() {
-        const val = parseFloat(document.getElementById('drawLength').value) || 0;
-        const unit = document.getElementById('drawLengthUnit').value;
-        const offset = parseFloat(document.getElementById('amoOffset').value) || 1.75;
-        
-        if(val === 0) {
-            document.getElementById('amoResult').value = '';
-            return;
-        }
-        
-        // Normalize to inches for AMO calculation (standard is inches)
-        let valInInches = val;
-        if(unit === 'cm') valInInches = val / 2.54;
-        if(unit === 'mm') valInInches = val / 25.4;
-        
-        const amo = valInInches + offset;
-        document.getElementById('amoResult').value = amo.toFixed(2) + '"';
-    }
-
-    // --- DYNAMIC STABILIZER ROWS ---
-    window.addStabRow = function(btn) {
-        const tbody = btn.previousElementSibling.querySelector('tbody');
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td><input type="number" class="comp-count weight-input" value="1" min="1"></td>
-            <td><input type="text" class="comp-type" placeholder="Závaží"></td>
-            <td>
-                <div class="table-input-group">
-                    <input type="number" class="comp-weight weight-input" placeholder="0">
-                    <select class="comp-unit weight-input"><option value="g">g</option><option value="oz">oz</option></select>
-                </div>
-            </td>
-            <td style="text-align:center;"><input type="checkbox" class="comp-ratio" checked></td>
-            <td><button type="button" class="btn-remove-row" onclick="removeStabRow(this)">×</button></td>
-        `;
-        tbody.appendChild(row);
-    }
-
-    window.removeStabRow = function(btn) { btn.closest('tr').remove(); calcWeights(); }
-
-    // --- WEIGHT CALCULATION LOGIC ---
-    window.calcWeights = function() {
-        const toGrams = (val, unit) => unit === 'oz' ? val * 28.3495 : val;
-        const fmt = (val) => val.toFixed(1) + ' g';
-        
-        const getWeightFromGroup = (idPrefix) => {
-            const valInput = document.getElementById(idPrefix+'Weight');
-            const unitSelect = document.getElementById(idPrefix+'WeightUnit');
-            if (!valInput || !unitSelect) return 0;
-            const val = parseFloat(valInput.value) || 0;
-            return toGrams(val, unitSelect.value);
-        }
-
-        const getBlockStats = (blockId) => {
-            const block = document.getElementById(blockId);
-            if(!block) return { total: 0, comps: 0, ratioPart: 0 };
-            
-            const baseVal = parseFloat(block.querySelector('.stab-base-weight').value) || 0;
-            const baseUnit = block.querySelector('.stab-base-weight + select').value;
-            let baseTotal = toGrams(baseVal, baseUnit);
-            let compsTotal = 0;
-            let ratioPart = 0;
-            
-            block.querySelectorAll('tbody tr').forEach(row => {
-                const count = parseFloat(row.querySelector('.comp-count').value) || 0;
-                const w = parseFloat(row.querySelector('.comp-weight').value) || 0;
-                const u = row.querySelector('.comp-unit').value;
-                const inRatio = row.querySelector('.comp-ratio').checked;
-                
-                const lineWeight = count * toGrams(w, u);
-                compsTotal += lineWeight;
-                if(inRatio) ratioPart += lineWeight;
-            });
-            return { total: baseTotal + compsTotal, comps: compsTotal, ratioPart };
-        };
-
-        const wRiser = getWeightFromGroup('riser');
-        const wSight = getWeightFromGroup('sightHw');
-        const wClicker = getWeightFromGroup('clicker');
-        const wButton = getWeightFromGroup('button');
-        const wExt = getWeightFromGroup('extender');
-        const wVbar = getWeightFromGroup('vbar');
-        const wLimbSingle = getWeightFromGroup('limb');
-        const wLimbsTotal = wLimbSingle * 2;
-
-        const sFront = getBlockStats('stabFrontBlock');
-        const sLeft = getBlockStats('stabLeftBlock');
-        const sRight = getBlockStats('stabRightBlock');
-
-        // Update Headers with Dual Sums
-        document.getElementById('statsFront').innerHTML = `<span>Komp: <b>${fmt(sFront.comps)}</b></span><span>Celk: <b>${fmt(sFront.total)}</b></span>`;
-        document.getElementById('statsLeft').innerHTML = `<span>Komp: <b>${fmt(sLeft.comps)}</b></span><span>Celk: <b>${fmt(sLeft.total)}</b></span>`;
-        document.getElementById('statsRight').innerHTML = `<span>Komp: <b>${fmt(sRight.comps)}</b></span><span>Celk: <b>${fmt(sRight.total)}</b></span>`;
-
-        // Summary
-        document.getElementById('sumRiser').textContent = fmt(wRiser);
-        document.getElementById('sumLimbs').textContent = fmt(wLimbsTotal);
-        document.getElementById('sumSight').textContent = fmt(wSight);
-        document.getElementById('sumClicker').textContent = fmt(wClicker);
-        document.getElementById('sumButton').textContent = fmt(wButton);
-        document.getElementById('sumFront').textContent = fmt(sFront.total);
-        document.getElementById('sumLeft').textContent = fmt(sLeft.total);
-        document.getElementById('sumRight').textContent = fmt(sRight.total);
-        document.getElementById('sumVbar').textContent = fmt(wVbar);
-        document.getElementById('sumExt').textContent = fmt(wExt);
-
-        const grandTotal = wRiser + wLimbsTotal + wSight + wClicker + wButton + wExt + wVbar + sFront.total + sLeft.total + sRight.total;
-        document.getElementById('sumTotalBow').textContent = fmt(grandTotal);
-
-        // Ratio
-        const ratioFront = sFront.ratioPart;
-        const ratioSide = sLeft.ratioPart + sRight.ratioPart;
-        
-        document.getElementById('ratioFrontVal').textContent = fmt(ratioFront);
-        document.getElementById('ratioSideVal').textContent = fmt(ratioSide);
-
-        if (ratioFront > 0) {
-            let ratioVal = (ratioSide / ratioFront).toFixed(2);
-            document.getElementById('sysRatio').textContent = `1 : ${ratioVal}`;
-        } else {
-            document.getElementById('sysRatio').textContent = `- : -`;
+    // Nastaví váhu/jednotku/model pro danou komponentu
+    function setWG(id, obj) {
+        if (obj) {
+            const w = document.getElementById(id + 'Weight');
+            const u = document.getElementById(id + 'WeightUnit');
+            const m = document.getElementById(id + 'Model') || document.getElementById(id);
+            if (w) w.value = obj.val || '';
+            if (u) u.value = obj.unit || 'g';
+            if (m) m.value = obj.model || '';
         }
     }
 
-    // --- DATA HELPERS ---
-    function getStabData(blockId) {
-        const block = document.getElementById(blockId);
-        const rows = [];
-        block.querySelectorAll('tbody tr').forEach(r => {
-            rows.push({
-                count: r.querySelector('.comp-count').value,
-                type: r.querySelector('.comp-type').value,
-                weight: r.querySelector('.comp-weight').value,
-                unit: r.querySelector('.comp-unit').value,
-                inRatio: r.querySelector('.comp-ratio').checked
-            });
-        });
-        
-        const angH = block.querySelector('.stab-ang-hor')?.value || '';
-        const angV = block.querySelector('.stab-ang-ver')?.value || '';
-
-        return {
-            model: block.querySelector('.stab-model').value,
-            len: block.querySelector('.stab-len').value,
-            lenUnit: block.querySelector('.stab-len-unit').value,
-            baseWeight: block.querySelector('.stab-base-weight').value,
-            baseUnit: block.querySelector('.stab-base-weight + select').value,
-            angH: angH,
-            angV: angV,
-            components: rows
-        };
-    }
-
+    // Nastaví kompletní data pro blok stabilizátoru
     function setStabData(blockId, data) {
         if(!data) return;
         const block = document.getElementById(blockId);
@@ -942,6 +630,288 @@
         }
     }
 
+    // HLAVNÍ FUNKCE PRO VYPLNĚNÍ FORMULÁŘE Z DAT
+    function fillFormFromData(entry) {
+        if(!entry) return;
+
+        // Vyplnění základních polí (kromě speciálních vah a stabilizátorů)
+        for(let k in entry) { 
+            const el = document.getElementById(k); 
+            if(el) el.value = entry[k]; 
+        }
+        
+        // Vyplnění vah výbavy
+        if(entry.equipWeights) {
+            const eq = entry.equipWeights;
+            setWG('riser', eq.riser);
+            setWG('sightHw', eq.sight);
+            setWG('clicker', eq.clicker);
+            setWG('button', eq.button);
+            setWG('limb', eq.limb);
+        }
+
+        // Vyplnění stabilizátorů
+        if(entry.stabilizers) {
+            const st = entry.stabilizers;
+            setStabData('stabFrontBlock', st.front);
+            setStabData('stabLeftBlock', st.left);
+            setStabData('stabRightBlock', st.right);
+            setWG('extender', st.extender);
+            setWG('vbar', st.vbar);
+        }
+        
+        calcWeights(); 
+        calcAMO();
+    }
+
+    // --- MENU & VIEW LOGIC ---
+    function toggleMenu() {
+        const menu = document.getElementById('navDropdown');
+        menu.classList.toggle('active');
+    }
+
+    document.addEventListener('click', function(event) {
+        const menu = document.getElementById('navDropdown');
+        const hamburger = document.querySelector('.hamburger-btn');
+        if (!menu.contains(event.target) && !hamburger.contains(event.target)) {
+            menu.classList.remove('active');
+        }
+    });
+
+    function switchView(viewName, linkElement) {
+        document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active-view'));
+        document.getElementById('view-' + viewName).classList.add('active-view');
+        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active-link'));
+        if(linkElement) linkElement.classList.add('active-link');
+        document.getElementById('navDropdown').classList.remove('active');
+        if(viewName === 'stats') { renderStats(); }
+    }
+    
+    // --- STATS CALCULATION ---
+    function renderStats() {
+        const entries = getEntries();
+        const container = document.getElementById('statsContent');
+        if(!entries.length) { container.innerHTML = '<div style="text-align:center; padding:30px; color:#777;">Zatím nejsou k dispozici žádná data pro statistiku.</div>'; return; }
+        
+        const now = new Date();
+        const startOfWeek = new Date(now);
+        startOfWeek.setDate(now.getDate() - now.getDay() + (now.getDay() === 0 ? -6 : 1));
+        startOfWeek.setHours(0,0,0,0);
+        const startOfLastWeek = new Date(startOfWeek);
+        startOfLastWeek.setDate(startOfLastWeek.getDate() - 7);
+        
+        let thisWeekArrows = 0; let lastWeekArrows = 0;
+        entries.forEach(e => {
+            const d = new Date(e.date);
+            const arrows = parseInt(e.arrowCount) || 0;
+            if(d >= startOfWeek) thisWeekArrows += arrows;
+            else if(d >= startOfLastWeek && d < startOfWeek) lastWeekArrows += arrows;
+        });
+        
+        let trend = '';
+        if(thisWeekArrows > lastWeekArrows) trend = '<span class="trend-up">⬆️</span>';
+        else if(thisWeekArrows < lastWeekArrows) trend = '<span class="trend-down">⬇️</span>';
+        else trend = '<span>➡️</span>';
+        
+        const currentString = entries[0].stringInfo || 'Neuvedeno';
+        let stringCount = 0;
+        for(let e of entries) { if(e.stringInfo === currentString) stringCount += (parseInt(e.arrowCount) || 0); else break; }
+        
+        let bhAlert = '';
+        if(entries.length >= 2) {
+            const cur = entries[0]; const prev = entries[1];
+            if(cur.braceHeight && prev.braceHeight && cur.braceHeightUnit === prev.braceHeightUnit) {
+                const diff = Math.abs(parseFloat(cur.braceHeight) - parseFloat(prev.braceHeight));
+                const threshold = cur.braceHeightUnit === 'mm' ? 2 : 0.2;
+                if(diff >= threshold) { bhAlert = `<div class="alert-box">⚠️ <strong>Změna BH!</strong> Tvé předpětí se změnilo o ${diff.toFixed(1)} ${cur.braceHeightUnit} oproti minulému tréninku. Zkontroluj protažení tětivy.</div>`; }
+            }
+        }
+        
+        let sum70 = 0; let count70 = 0;
+        entries.forEach(e => {
+            if(parseInt(e.distance) === 70 && e.sightElevation) {
+                let val = parseFloat(e.sightElevation.replace(',','.'));
+                if(!isNaN(val)) { sum70 += val; count70++; }
+            }
+        });
+        const avg70 = count70 > 0 ? (sum70 / count70).toFixed(2) : '-';
+
+        container.innerHTML = `
+            <div class="stat-grid">
+                <div class="stat-card"><div class="stat-header">Objem (Tento týden)</div><div class="stat-value-big">${thisWeekArrows} ${trend}</div><div class="stat-subtext">Minulý týden: ${lastWeekArrows}</div></div>
+                <div class="stat-card"><div class="stat-header">Tětiva (Odometer)</div><div class="stat-value-big">${stringCount}</div><div class="stat-subtext">${currentString}</div></div>
+                <div class="stat-card"><div class="stat-header">Průměrná Mířidla (70m)</div><div class="stat-value-big">${avg70}</div><div class="stat-subtext">Zprůměrováno z ${count70} záznamů</div></div>
+            </div>
+            ${bhAlert}
+        `;
+    }
+
+    // --- EXISTING APP LOGIC ---
+    const form = document.getElementById('archeryForm');
+    const entriesList = document.getElementById('entriesList');
+    const sightTableBody = document.getElementById('sightTableBody');
+    const submitBtn = document.getElementById('submitBtn');
+    const cancelEditBtn = document.getElementById('cancelEditBtn');
+    const mainCard = document.getElementById('mainCard');
+    const editIdInput = document.getElementById('editId');
+    const archerNameInput = document.getElementById('archerName');
+    const archerBowTypeInput = document.getElementById('bowType');
+    const mainTitle = document.getElementById('mainTitle');
+
+    const STORAGE_KEY_DATA = 'elite_archery_log_v16'; 
+    const TRACKED_DISTANCES = [5, 10, 15, 18, 20, 25, 30, 40, 50, 60, 70, 90];
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadDefaults(); setNow(); renderEntries(); updateTitle(); calcWeights(); calcAMO();
+        document.addEventListener('input', e => { if(e.target.classList.contains('weight-input')) calcWeights(); if(e.target.classList.contains('draw-calc-input')) calcAMO(); });
+        document.addEventListener('change', e => { if(e.target.classList.contains('weight-input') || e.target.classList.contains('comp-ratio')) calcWeights(); if(e.target.classList.contains('draw-calc-input')) calcAMO(); });
+    });
+
+    archerNameInput.addEventListener('input', updateTitle);
+    archerBowTypeInput.addEventListener('change', updateTitle);
+
+    function updateTitle() {
+        const name = archerNameInput.value.trim();
+        const divAbbr = archerBowTypeInput.value; 
+        mainTitle.textContent = name ? `${name} (${divAbbr}) - Archery Log` : "Archery Log";
+    }
+
+    function setNow() {
+        const now = new Date();
+        document.getElementById('date').valueAsDate = now;
+        document.getElementById('time').value = now.toTimeString().substring(0,5);
+    }
+    
+    // --- DRAW LENGTH CALCULATOR ---
+    window.calcAMO = function() {
+        const val = parseFloat(document.getElementById('drawLength').value) || 0;
+        const unit = document.getElementById('drawLengthUnit').value;
+        const offset = parseFloat(document.getElementById('amoOffset').value) || 1.75;
+        if(val === 0) { document.getElementById('amoResult').value = ''; return; }
+        let valInInches = val;
+        if(unit === 'cm') valInInches = val / 2.54;
+        if(unit === 'mm') valInInches = val / 25.4;
+        const amo = valInInches + offset;
+        document.getElementById('amoResult').value = amo.toFixed(2) + '"';
+    }
+
+    // --- DYNAMIC STABILIZER ROWS ---
+    window.addStabRow = function(btn) {
+        const tbody = btn.previousElementSibling.querySelector('tbody');
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td><input type="number" class="comp-count weight-input" value="1" min="1"></td>
+            <td><input type="text" class="comp-type" placeholder="Závaží"></td>
+            <td><div class="table-input-group"><input type="number" class="comp-weight weight-input" placeholder="0"><select class="comp-unit weight-input"><option value="g">g</option><option value="oz">oz</option></select></div></td>
+            <td style="text-align:center;"><input type="checkbox" class="comp-ratio" checked></td>
+            <td><button type="button" class="btn-remove-row" onclick="removeStabRow(this)">×</button></td>
+        `;
+        tbody.appendChild(row);
+    }
+
+    window.removeStabRow = function(btn) { btn.closest('tr').remove(); calcWeights(); }
+
+    // --- WEIGHT CALCULATION LOGIC ---
+    window.calcWeights = function() {
+        const toGrams = (val, unit) => unit === 'oz' ? val * 28.3495 : val;
+        const fmt = (val) => val.toFixed(1) + ' g';
+        
+        const getWeightFromGroup = (idPrefix) => {
+            const valInput = document.getElementById(idPrefix+'Weight');
+            const unitSelect = document.getElementById(idPrefix+'WeightUnit');
+            if (!valInput || !unitSelect) return 0;
+            const val = parseFloat(valInput.value) || 0;
+            return toGrams(val, unitSelect.value);
+        }
+
+        const getBlockStats = (blockId) => {
+            const block = document.getElementById(blockId);
+            if(!block) return { total: 0, comps: 0, ratioPart: 0 };
+            const baseVal = parseFloat(block.querySelector('.stab-base-weight').value) || 0;
+            const baseUnit = block.querySelector('.stab-base-weight + select').value;
+            let baseTotal = toGrams(baseVal, baseUnit);
+            let compsTotal = 0; let ratioPart = 0;
+            block.querySelectorAll('tbody tr').forEach(row => {
+                const count = parseFloat(row.querySelector('.comp-count').value) || 0;
+                const w = parseFloat(row.querySelector('.comp-weight').value) || 0;
+                const u = row.querySelector('.comp-unit').value;
+                const inRatio = row.querySelector('.comp-ratio').checked;
+                const lineWeight = count * toGrams(w, u);
+                compsTotal += lineWeight;
+                if(inRatio) ratioPart += lineWeight;
+            });
+            return { total: baseTotal + compsTotal, comps: compsTotal, ratioPart };
+        };
+
+        const wRiser = getWeightFromGroup('riser');
+        const wSight = getWeightFromGroup('sightHw');
+        const wClicker = getWeightFromGroup('clicker');
+        const wButton = getWeightFromGroup('button');
+        const wExt = getWeightFromGroup('extender');
+        const wVbar = getWeightFromGroup('vbar');
+        const wLimbSingle = getWeightFromGroup('limb');
+        const wLimbsTotal = wLimbSingle * 2;
+
+        const sFront = getBlockStats('stabFrontBlock');
+        const sLeft = getBlockStats('stabLeftBlock');
+        const sRight = getBlockStats('stabRightBlock');
+
+        document.getElementById('statsFront').innerHTML = `<span>Komp: <b>${fmt(sFront.comps)}</b></span><span>Celk: <b>${fmt(sFront.total)}</b></span>`;
+        document.getElementById('statsLeft').innerHTML = `<span>Komp: <b>${fmt(sLeft.comps)}</b></span><span>Celk: <b>${fmt(sLeft.total)}</b></span>`;
+        document.getElementById('statsRight').innerHTML = `<span>Komp: <b>${fmt(sRight.comps)}</b></span><span>Celk: <b>${fmt(sRight.total)}</b></span>`;
+
+        document.getElementById('sumRiser').textContent = fmt(wRiser);
+        document.getElementById('sumLimbs').textContent = fmt(wLimbsTotal);
+        document.getElementById('sumSight').textContent = fmt(wSight);
+        document.getElementById('sumClicker').textContent = fmt(wClicker);
+        document.getElementById('sumButton').textContent = fmt(wButton);
+        document.getElementById('sumFront').textContent = fmt(sFront.total);
+        document.getElementById('sumLeft').textContent = fmt(sLeft.total);
+        document.getElementById('sumRight').textContent = fmt(sRight.total);
+        document.getElementById('sumVbar').textContent = fmt(wVbar);
+        document.getElementById('sumExt').textContent = fmt(wExt);
+
+        const grandTotal = wRiser + wLimbsTotal + wSight + wClicker + wButton + wExt + wVbar + sFront.total + sLeft.total + sRight.total;
+        document.getElementById('sumTotalBow').textContent = fmt(grandTotal);
+
+        const ratioFront = sFront.ratioPart;
+        const ratioSide = sLeft.ratioPart + sRight.ratioPart;
+        document.getElementById('ratioFrontVal').textContent = fmt(ratioFront);
+        document.getElementById('ratioSideVal').textContent = fmt(ratioSide);
+
+        if (ratioFront > 0) {
+            let ratioVal = (ratioSide / ratioFront).toFixed(2);
+            document.getElementById('sysRatio').textContent = `1 : ${ratioVal}`;
+        } else {
+            document.getElementById('sysRatio').textContent = `- : -`;
+        }
+    }
+
+    // --- DATA HELPERS ---
+    function getStabData(blockId) {
+        const block = document.getElementById(blockId);
+        const rows = [];
+        block.querySelectorAll('tbody tr').forEach(r => {
+            rows.push({
+                count: r.querySelector('.comp-count').value,
+                type: r.querySelector('.comp-type').value,
+                weight: r.querySelector('.comp-weight').value,
+                unit: r.querySelector('.comp-unit').value,
+                inRatio: r.querySelector('.comp-ratio').checked
+            });
+        });
+        const angH = block.querySelector('.stab-ang-hor')?.value || '';
+        const angV = block.querySelector('.stab-ang-ver')?.value || '';
+        return {
+            model: block.querySelector('.stab-model').value,
+            len: block.querySelector('.stab-len').value,
+            lenUnit: block.querySelector('.stab-len-unit').value,
+            baseWeight: block.querySelector('.stab-base-weight').value,
+            baseUnit: block.querySelector('.stab-base-weight + select').value,
+            angH: angH, angV: angV, components: rows
+        };
+    }
+
     // --- FORM HANDLING ---
     form.addEventListener('submit', (e) => {
         e.preventDefault();
@@ -949,36 +919,28 @@
             const formData = {};
             for(let el of form.elements) { if(el.id) formData[el.id] = el.value; }
 
-            // Robust getWG with explicit IDs
-            const getWG = (id) => {
+            const getWGData = (id) => {
                 const w = document.getElementById(id+'Weight');
                 const u = document.getElementById(id+'WeightUnit');
-                const m = document.getElementById(id+'Model') || document.getElementById(id); // fallback for 'riser' vs 'riserModel'
-                return { 
-                    val: w ? w.value : '', 
-                    unit: u ? u.value : 'g',
-                    model: m ? m.value : ''
-                };
+                const m = document.getElementById(id+'Model') || document.getElementById(id);
+                return { val: w ? w.value : '', unit: u ? u.value : 'g', model: m ? m.value : '' };
             };
 
             const stabPayload = {
                 front: getStabData('stabFrontBlock'),
                 left: getStabData('stabLeftBlock'),
                 right: getStabData('stabRightBlock'),
-                extender: getWG('extender'),
-                vbar: getWG('vbar'),
-                totals: { 
-                    totalBow: document.getElementById('sumTotalBow').textContent, 
-                    ratio: document.getElementById('sysRatio').textContent 
-                }
+                extender: getWGData('extender'),
+                vbar: getWGData('vbar'),
+                totals: { totalBow: document.getElementById('sumTotalBow').textContent, ratio: document.getElementById('sysRatio').textContent }
             };
             
             const equipWeights = {
-                riser: getWG('riser'),
-                sight: getWG('sightHw'),
-                clicker: getWG('clicker'),
-                button: getWG('button'),
-                limb: getWG('limb')
+                riser: getWGData('riser'),
+                sight: getWGData('sightHw'),
+                clicker: getWGData('clicker'),
+                button: getWGData('button'),
+                limb: getWGData('limb')
             };
 
             const newEntry = { id: Date.now(), ...formData, stabilizers: stabPayload, equipWeights: equipWeights };
@@ -989,76 +951,60 @@
             } else { entries.unshift(newEntry); }
             
             localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(entries));
-            
-            alert('Uloženo!'); 
-            renderEntries(); 
-            // Po uložení resetujeme formulář a znovu načteme defaulty (poslední záznam), ale s čistým datem
-            cancelEdit(); 
-        } catch(err) {
-            alert('Chyba při ukládání: ' + err.message);
-            console.error(err);
-        }
+            alert('Uloženo!'); renderEntries(); cancelEdit(); 
+        } catch(err) { alert('Chyba při ukládání: ' + err.message); console.error(err); }
     });
 
-    function getEntries() { 
-        try {
-            return JSON.parse(localStorage.getItem(STORAGE_KEY_DATA) || '[]'); 
-        } catch(e) { return []; }
+    function getEntries() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY_DATA) || '[]'); } catch(e) { return []; } }
+
+    // --- AUTO-FILL & LOAD LOGIC ---
+    
+    // Tlačítko "Načíst poslední konfiguraci"
+    window.manualLoadLast = function() {
+        loadDefaults();
+        setNow();
+        alert('Poslední známá konfigurace načtena.');
+        mainCard.scrollIntoView({ behavior: 'smooth' });
     }
 
-    // --- AUTO-FILL FROM HISTORY (OPRAVENO) ---
+    // Tlačítko "Načíst data" z historie (jako nový záznam)
+    window.loadEntryAsNew = function(id) {
+        switchView('log');
+        const entry = getEntries().find(x => x.id === id);
+        if(!entry) return;
+
+        // 1. Vyplnit všechna technická data z historie
+        fillFormFromData(entry);
+
+        // 2. Resetovat specifická pole pro NOVÝ záznam
+        document.getElementById('editId').value = ''; // Důležité: ID musí být prázdné
+        setNow(); // Nastavit dnešní datum
+        document.getElementById('notes').value = ''; // Vymazat poznámky
+        document.getElementById('arrowCount').value = ''; // Vymazat počet šípů
+        
+        // Pozn: Vzdálenost a typ tréninku necháváme, často se opakuje stejný setup
+        
+        alert('Konfigurace z historie načtena pro dnešní den.');
+        mainCard.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // Automatické načtení při startu
     function loadDefaults() {
         try {
             const entries = getEntries();
             const lastEntry = entries.length > 0 ? entries[0] : null;
 
             if (lastEntry) {
-                // Seznam polí, která se NESMÍ vyplnit automaticky (mají být prázdná pro nový trénink)
-                const skip = ['id', 'date', 'time', 'notes', 'arrowCount', 'distance', 'trainingType', 'location'];
-                
-                // 1. Vyplnění jednoduchých inputů
-                for(let k in lastEntry) {
-                    if(skip.includes(k)) continue; // Přeskoč datum, čas, počet šípů...
-                    const el = document.getElementById(k);
-                    // Vyplňujeme jen pokud nejsme v režimu editace existujícího záznamu
-                    if(el && !editIdInput.value) el.value = lastEntry[k];
+                // Pokud neneditujeme, načteme poslední záznam jako výchozí
+                if(!editIdInput.value) {
+                    fillFormFromData(lastEntry);
+                    // Ale vyčistíme "session specific" data
+                    const clearFields = ['id', 'date', 'time', 'notes', 'arrowCount', 'distance', 'trainingType', 'location'];
+                    clearFields.forEach(k => {
+                        const el = document.getElementById(k);
+                        if(el) el.value = '';
+                    });
                 }
-
-                // Pomocná funkce pro vyplnění vah a modelů
-                const setWG = (id, obj) => {
-                    if (obj) {
-                        const w = document.getElementById(id + 'Weight');
-                        const u = document.getElementById(id + 'WeightUnit');
-                        const m = document.getElementById(id + 'Model') || document.getElementById(id);
-                        if (w) w.value = obj.val || '';
-                        if (u) u.value = obj.unit || 'g';
-                        if (m) m.value = obj.model || '';
-                    }
-                };
-
-                // 2. Vyplnění vah výbavy
-                if(lastEntry.equipWeights && !editIdInput.value) {
-                    const eq = lastEntry.equipWeights;
-                    setWG('riser', eq.riser);
-                    setWG('sightHw', eq.sight);
-                    setWG('clicker', eq.clicker);
-                    setWG('button', eq.button);
-                    setWG('limb', eq.limb);
-                }
-
-                // 3. Vyplnění stabilizátorů (včetně tabulek)
-                if(lastEntry.stabilizers && !editIdInput.value) {
-                    const st = lastEntry.stabilizers;
-                    setStabData('stabFrontBlock', st.front);
-                    setStabData('stabLeftBlock', st.left);
-                    setStabData('stabRightBlock', st.right);
-                    setWG('extender', st.extender);
-                    setWG('vbar', st.vbar);
-                }
-                
-                // Přepočítat ihned po načtení
-                calcWeights();
-                calcAMO();
             }
         } catch(e) { console.error("Error autofilling:", e); }
     }
@@ -1069,35 +1015,7 @@
         const entry = getEntries().find(x => x.id === id);
         if(!entry) return;
         
-        // Fill basic fields
-        for(let k in entry) { const el = document.getElementById(k); if(el) el.value = entry[k]; }
-        
-        const setWG = (id, obj) => { 
-            if (obj) {
-                const w = document.getElementById(id + 'Weight');
-                const u = document.getElementById(id + 'WeightUnit');
-                const m = document.getElementById(id + 'Model') || document.getElementById(id);
-                if (w) w.value = obj.val || '';
-                if (u) u.value = obj.unit || 'g';
-                if (m) m.value = obj.model || '';
-            }
-        };
-
-        if(entry.equipWeights) {
-            setWG('riser', entry.equipWeights.riser);
-            setWG('sightHw', entry.equipWeights.sight);
-            setWG('clicker', entry.equipWeights.clicker);
-            setWG('button', entry.equipWeights.button);
-            setWG('limb', entry.equipWeights.limb);
-        }
-
-        if(entry.stabilizers) {
-            setStabData('stabFrontBlock', entry.stabilizers.front);
-            setStabData('stabLeftBlock', entry.stabilizers.left);
-            setStabData('stabRightBlock', entry.stabilizers.right);
-            setWG('extender', entry.stabilizers.extender);
-            setWG('vbar', entry.stabilizers.vbar);
-        }
+        fillFormFromData(entry);
 
         editIdInput.value = id;
         submitBtn.textContent = "💾 Aktualizovat záznam";
@@ -1108,13 +1026,8 @@
     }
 
     window.cancelEdit = function() {
-        editIdInput.value = ''; 
-        form.reset(); 
-        
-        // Znovu načíst poslední data (jako šablonu) a nastavit dnešní datum
-        loadDefaults(); 
-        setNow();
-        
+        editIdInput.value = ''; form.reset(); 
+        loadDefaults(); setNow(); // Reset do výchozího stavu (poslední konfigurace, dnešní datum)
         submitBtn.textContent = "Uložit Záznam";
         submitBtn.classList.remove('btn-update');
         cancelEditBtn.style.display = 'none';
@@ -1130,12 +1043,8 @@
         }
     }
 
-    // --- TOGGLE HISTORY ---
-    window.toggleEntry = function(header) {
-        header.closest('.entry-item').classList.toggle('expanded');
-    }
+    window.toggleEntry = function(header) { header.closest('.entry-item').classList.toggle('expanded'); }
 
-    // --- EXPORT/IMPORT ---
     window.exportData = function() {
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({version:"v16", data:getEntries()}));
         const a = document.createElement('a'); a.href = dataStr; a.download = `ArcheryLog_${new Date().toISOString().split('T')[0]}.json`; a.click();
@@ -1200,6 +1109,8 @@
                     </div>
                     <div class="entry-toggle-icon">▼</div>
                     <div class="entry-actions">
+                        <button class="btn-icon" onclick="event.stopPropagation(); loadEntryAsNew(${e.id})" title="Načíst konfiguraci (jako nový)">📥</button>
+                        
                         <button class="btn-icon" onclick="event.stopPropagation(); editEntry(${e.id})" title="Upravit">✏️</button>
                         <button class="btn-icon" onclick="event.stopPropagation(); deleteEntry(${e.id})" style="color:red;">🗑️</button>
                     </div>
@@ -1242,5 +1153,4 @@
     }
 </script>
 </body>
-
 </html>
