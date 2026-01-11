@@ -1,0 +1,1245 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#8cbd24">
+    <title>Archery Log</title>
+    
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3e%3ccircle cx='50' cy='50' r='45' fill='%238cbd24'/%3e%3ccircle cx='50' cy='50' r='35' fill='white'/%3e%3ccircle cx='50' cy='50' r='15' fill='%238cbd24'/%3e%3c/svg%3e">
+
+    <style>
+        :root {
+            --primary-color: #8cbd24;
+            --primary-dark: #6a9616;
+            --bg-color: #f8f9fa;
+            --card-bg: #ffffff;
+            --text-color: #333333;
+            --border-radius: 8px;
+            --edit-color: #3498db;
+            --danger-color: #e74c3c;
+            --success-color: #27ae60;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 10px;
+            line-height: 1.4;
+        }
+
+        .container { max-width: 1200px; margin: 0 auto; padding-bottom: 80px; }
+
+        /* HEADER & MENU */
+        .app-header {
+            display: flex; flex-direction: row; align-items: center; justify-content: space-between; margin-bottom: 20px;
+            background: #fff; padding: 15px; border-radius: var(--border-radius); border-bottom: 3px solid var(--primary-color);
+            position: relative;
+        }
+        .header-brand { display: flex; align-items: center; gap: 15px; }
+        .app-logo { max-height: 50px; width: auto; }
+        h1 { color: #333; font-size: 1.4rem; margin: 0; font-weight: 800; text-transform: uppercase; }
+
+        /* Hamburger Menu Styles */
+        .menu-wrapper { position: relative; }
+        .hamburger-btn {
+            background: none; border: none; font-size: 2rem; color: var(--primary-dark); cursor: pointer; padding: 0 10px;
+        }
+        .nav-dropdown {
+            display: none; position: absolute; top: 100%; right: 0;
+            background: white; border: 1px solid #ddd; border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.15); z-index: 1000;
+            width: 200px; overflow: hidden; margin-top: 10px;
+        }
+        .nav-dropdown.active { display: block; }
+        .nav-item {
+            display: block; padding: 12px 20px; color: #333; text-decoration: none;
+            border-bottom: 1px solid #eee; cursor: pointer; font-weight: 600; font-size: 0.95rem;
+        }
+        .nav-item:last-child { border-bottom: none; }
+        .nav-item:hover { background-color: #f9f9f9; color: var(--primary-color); }
+        .nav-item.active-link { background-color: #e9f5db; color: var(--primary-dark); }
+
+        /* VIEW MANAGEMENT */
+        .view-section { display: none; animation: fadeIn 0.3s ease; }
+        .view-section.active-view { display: block; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* INFO & BACKUP PAGES STYLES */
+        .info-page-content, .backup-page-content {
+            background: white; padding: 30px; border-radius: var(--border-radius);
+            box-shadow: 0 3px 10px rgba(0,0,0,0.05); border-top: 4px solid var(--primary-color);
+        }
+        .info-heading { color: var(--primary-dark); border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 0; }
+        .info-text { color: #555; font-size: 1rem; line-height: 1.6; margin-bottom: 15px; }
+        .backup-controls-panel {
+            display: flex; gap: 15px; flex-wrap: wrap; margin-top: 20px; justify-content: flex-start;
+        }
+
+        /* STATS PAGE STYLES */
+        .stat-card {
+            background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05); border: 1px solid #eee;
+        }
+        .stat-header { font-size: 0.9rem; font-weight: 700; color: #7f8c8d; text-transform: uppercase; margin-bottom: 10px; }
+        .stat-value-big { font-size: 2rem; font-weight: 800; color: var(--primary-dark); }
+        .stat-subtext { font-size: 0.9rem; color: #555; margin-top: 5px; }
+        .trend-up { color: var(--success-color); }
+        .trend-down { color: var(--danger-color); }
+        .stat-grid { display: grid; grid-template-columns: 1fr; gap: 15px; }
+        @media (min-width: 600px) { .stat-grid { grid-template-columns: 1fr 1fr; } }
+        .alert-box { background: #ffe6e6; border-left: 5px solid var(--danger-color); padding: 15px; border-radius: 4px; color: #c0392b; margin-bottom: 15px; }
+
+        @media (min-width: 768px) {
+            body { padding: 20px; }
+            .app-logo { max-height: 70px; }
+            h1 { font-size: 1.6rem; }
+        }
+
+        /* GRID */
+        .dashboard-grid { display: flex; flex-direction: column; gap: 20px; }
+        @media (min-width: 1100px) {
+            .dashboard-grid { display: grid; grid-template-columns: 350px 1fr; align-items: start; }
+            .sight-card { position: sticky; top: 20px; }
+        }
+
+        .card {
+            background: var(--card-bg); border-radius: var(--border-radius);
+            box-shadow: 0 3px 10px rgba(0,0,0,0.05); padding: 20px; border-top: 4px solid var(--primary-color);
+        }
+        .card.editing-mode { border-color: var(--edit-color); box-shadow: 0 0 15px rgba(52, 152, 219, 0.2); }
+
+        .section-title {
+            background-color: #e9f5db; padding: 8px 12px; border-radius: 4px;
+            font-size: 0.85rem; font-weight: 700; color: var(--primary-dark);
+            text-transform: uppercase; letter-spacing: 0.5px; margin: 30px 0 15px 0;
+            border-left: 4px solid var(--primary-color);
+        }
+
+        .form-grid { display: grid; grid-template-columns: 1fr; gap: 12px; margin-bottom: 12px; }
+        @media (min-width: 600px) { .form-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (min-width: 1024px) { .form-grid.triple { grid-template-columns: repeat(3, 1fr); } }
+        .date-time-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 10px; }
+        .form-group { margin-bottom: 0; }
+
+        label { display: block; margin-bottom: 4px; font-weight: 700; font-size: 0.75rem; color: #555; text-transform: uppercase; text-align: left; }
+
+        /* INPUTS */
+        input.standard-input, textarea, select.standard-select, .input-group input {
+            width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px;
+            box-sizing: border-box; font-size: 15px; color: #333; background: #fff; text-align: left;
+        }
+
+        .input-group { display: flex; border: 1px solid #ccc; border-radius: 4px; overflow: hidden; }
+        .input-group input { border: none; border-radius: 0; }
+        .input-group select {
+            border: none; border-left: 1px solid #ccc; background-color: #f1f1f1;
+            flex: 0 0 75px; width: 75px; font-weight: bold; color: #333; padding: 0 5px; text-align: center;
+        }
+        input:focus, textarea:focus, select:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(140, 189, 36, 0.2); }
+
+        /* STABILIZER STYLES */
+        .stab-container { background: #fdfdfd; border: 1px solid #eee; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
+        .stab-header { font-weight: 800; color: var(--primary-dark); margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; border-bottom: 2px solid #eee; padding-bottom: 5px; }
+        .stab-stats { background: #f1f1f1; padding: 3px 8px; border-radius: 4px; font-size: 0.8rem; display: flex; gap: 10px; }
+        .stab-stats span { display: inline-block; }
+        .stab-stats b { color: var(--primary-color); }
+        
+        .comp-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.85rem; }
+        .comp-table th { text-align: left; background: #eee; padding: 6px; font-size: 0.7rem; color: #555; }
+        .comp-table td { padding: 5px; border-bottom: 1px solid #f0f0f0; }
+        
+        .comp-table input, .comp-table select { width: 100%; padding: 6px; border: 1px solid #ddd; text-align: left; border-radius: 3px; }
+        .table-input-group { display: flex; border: 1px solid #ddd; border-radius: 3px; overflow: hidden; }
+        .table-input-group input { border: none; flex: 1; }
+        .table-input-group select { border: none; border-left: 1px solid #ddd; width: 50px; background: #f9f9f9; padding: 0; font-size: 0.8rem; text-align: center; font-weight: bold; }
+
+        .btn-add-row { background: #e9ecef; border: 1px dashed #ccc; width: 100%; padding: 5px; margin-top: 5px; cursor: pointer; color: #555; font-size: 0.8rem; font-weight: 600; text-align: center; }
+        .btn-add-row:hover { background: #dfe6e9; color: var(--primary-dark); }
+        .btn-remove-row { color: red; cursor: pointer; font-weight: bold; border: none; background: none; font-size: 1.2rem; }
+
+        /* SUMMARY TABLE SECTION */
+        .system-summary { margin-top: 30px; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; }
+        .summary-header { background: #333; color: white; padding: 10px; font-weight: bold; text-transform: uppercase; font-size: 0.9rem; }
+        .summary-row { display: flex; justify-content: space-between; padding: 8px 15px; border-bottom: 1px solid #eee; background: #fff; font-size: 0.9rem; }
+        .summary-row:last-child { border-bottom: none; }
+        .summary-row.total { background: #f0f0f0; font-weight: 800; border-top: 2px solid #ddd; font-size: 1.1rem; color: var(--primary-dark); }
+        .ratio-section { margin-top: 20px; background: #e9f5db; border: 1px solid var(--primary-color); border-radius: 8px; padding: 15px; }
+        .ratio-title { font-weight: 800; color: var(--primary-dark); margin-bottom: 10px; text-transform: uppercase; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 5px; }
+        .ratio-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .ratio-box label { font-size: 0.7rem; color: #555; }
+        .ratio-val { font-size: 1.2rem; font-weight: bold; color: #333; }
+        .ratio-result { grid-column: span 2; text-align: center; background: #fff; padding: 10px; border-radius: 4px; margin-top: 5px; }
+        .ratio-result strong { color: var(--primary-color); font-size: 1.5rem; }
+
+        /* BUTTONS */
+        .btn { background-color: var(--primary-color); color: white; border: none; padding: 14px; border-radius: 4px; font-size: 1rem; font-weight: 700; width: 100%; cursor: pointer; margin-top: 15px; text-transform: uppercase; letter-spacing: 0.5px; transition: background 0.2s; }
+        .btn:hover { background-color: var(--primary-dark); }
+        .btn.btn-update { background-color: var(--edit-color); }
+        .btn-cancel-edit { background-color: #95a5a6; margin-top: 10px; display: none; }
+        
+        /* Nová tlačítka pro zálohu - větší */
+        .btn-backup-large { 
+            background-color: #fff; color: var(--primary-color); border: 2px solid var(--primary-color); 
+            font-size: 1rem; padding: 12px 25px; border-radius: 6px; font-weight: 700; cursor: pointer; 
+            display: flex; align-items: center; gap: 10px; transition: all 0.2s;
+        }
+        .btn-backup-large:hover { background-color: var(--primary-color); color: white; }
+
+        /* HISTORY */
+        .entry-item { background: #fff; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); border: 1px solid #eee; border-left: 5px solid var(--primary-color); overflow: hidden; }
+        .entry-top { padding: 12px 15px; background: #fff; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: background 0.2s; }
+        .entry-top:hover { background: #fdfdfd; }
+        .entry-main-info { flex: 1; }
+        .entry-date { font-size: 1rem; font-weight: 800; color: #333; margin-bottom: 4px; }
+        .entry-badges { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+        .badge { font-size: 0.75rem; padding: 3px 8px; border-radius: 4px; font-weight: 700; text-transform: uppercase; }
+        .badge-type { background: #e9ecef; color: #555; }
+        .badge-dist { background: var(--primary-color); color: white; }
+        .badge-arrows { background: #333; color: white; }
+        .badge-sight { border: 1px solid #ccc; color: #333; background: #fff; display: flex; gap: 5px; align-items: center; }
+        .entry-toggle-icon { font-size: 1.2rem; color: #ccc; margin: 0 15px; transition: transform 0.3s; }
+        .entry-item.expanded .entry-toggle-icon { transform: rotate(180deg); color: var(--primary-color); }
+        .entry-actions { display: flex; gap: 5px; }
+        .btn-icon { width: 32px; height: 32px; border-radius: 4px; border: 1px solid #ddd; background: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .btn-icon:hover { background: #f0f0f0; }
+        .entry-body { padding: 15px; display: none; border-top: 1px solid #f0f0f0; background: #fcfcfc; }
+        .entry-item.expanded .entry-body { display: block; }
+        .info-block { margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px dashed #eee; }
+        .info-block:last-child { border-bottom: none; }
+        .block-title { font-size: 0.7rem; font-weight: 800; color: #aaa; text-transform: uppercase; margin-bottom: 6px; }
+        .data-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+        @media (min-width: 500px) { .data-grid { grid-template-columns: repeat(3, 1fr); } }
+        .data-item { background: #fff; padding: 5px 8px; border-radius: 4px; border: 1px solid #eee; text-align: left; }
+        .data-label { display: block; font-size: 0.65rem; color: #888; text-transform: uppercase; font-weight: 600; margin-bottom: 3px; }
+        .data-val { font-size: 0.9rem; font-weight: 600; color: #333; }
+        .note-box { background: #fffae6; color: #8a6d3b; padding: 10px; border-radius: 4px; font-style: italic; font-size: 0.9rem; margin-top: 5px; border-left: 3px solid #ffe08a; }
+        .sight-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .sight-table th { background-color: var(--primary-color); color: white; padding: 8px; text-align: left; }
+        .sight-table td { border-bottom: 1px solid #eee; padding: 8px; color: #333; text-align: left; }
+        .dist-cell { font-weight: 900; color: var(--primary-dark); width: 15%; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header class="app-header">
+        <div class="header-brand">
+            <img src="https://www.lukostrelbabrno.cz/wp-content/uploads/2015/08/logo.png" alt="Lukostřelba Brno" class="app-logo" onerror="this.onerror=null; this.src='data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 100 100\'%3e%3ccircle cx=\'50\' cy=\'50\' r=\'45\' fill=\'%238cbd24\'/%3e%3c/svg%3e'">
+            <h1 id="mainTitle">Archery Log</h1>
+        </div>
+        
+        <div class="menu-wrapper">
+            <button class="hamburger-btn" onclick="toggleMenu()">☰</button>
+            <div id="navDropdown" class="nav-dropdown">
+                <a onclick="switchView('info', this)" class="nav-item">ℹ️ Informace</a>
+                <a onclick="switchView('log', this)" class="nav-item active-link">🎯 Archery Log</a>
+                <a onclick="switchView('stats', this)" class="nav-item">📊 Statistiky</a>
+                <a onclick="switchView('backup', this)" class="nav-item">💾 Záloha/Obnova</a>
+            </div>
+        </div>
+    </header>
+
+    <div id="view-info" class="view-section">
+        <div class="info-page-content">
+            <h2 class="info-heading">O aplikaci Archery Log</h2>
+            <p class="info-text">
+                Vítejte v <strong>Archery Log</strong>, specializovaném nástroji pro profesionální lukostřelce olympijského stylu. 
+                Tato aplikace byla navržena tak, aby vám pomohla systematicky zaznamenávat vaše tréninky, závody a především technické nastavení vašeho luku.
+            </p>
+            <h3 style="color:#6a9616; margin-bottom:10px;">Co aplikace umožňuje?</h3>
+            <ul class="info-text">
+                <li><strong>Evidenci tréninků:</strong> Sledujte objemy nastřílených šípů, vzdálenosti a typy tréninků (technika, kondice, bodování).</li>
+                <li><strong>Detailní setup luku:</strong> Ukládejte si přesné hodnoty Tilleru, Brace Height (předpětí), sílu ramen a nastavení buttonu či klapačky.</li>
+                <li><strong>Délka Nátahu:</strong> Výpočet skutečné délky a AMO standardu pro výběr správných šípů.</li>
+                <li><strong>Mířidla (Sight Marks):</strong> Automatický přehled vašich mířidel pro standardní vzdálenosti (70m, 60m, atd.) na základě posledních záznamů.</li>
+                <li><strong>Statistiky:</strong> Automatická analýza týdenního objemu, počítadlo výstřelů na tětivu a hlídání konzistence BH.</li>
+            </ul>
+        </div>
+    </div>
+
+    <div id="view-stats" class="view-section">
+        <div id="statsContent">
+            <div style="text-align:center; padding:20px;">Načítám data...</div>
+        </div>
+    </div>
+
+    <div id="view-log" class="view-section active-view">
+        <div class="dashboard-grid">
+            <div class="card sight-card">
+                <h2 style="font-size:1rem; margin-top:0; color:var(--primary-color); text-align:center;">📏 MÍŘIDLA (SIGHT MARKS)</h2>
+                <div style="overflow-x: auto;">
+                    <table class="sight-table">
+                        <thead><tr><th>m</th><th>Výška / Strana</th><th>Datum</th></tr></thead>
+                        <tbody id="sightTableBody"><tr><td colspan="3" style="color:#999;">Žádná data.</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card" id="mainCard">
+                <form id="archeryForm">
+                    <input type="hidden" id="editId">
+
+                    <div class="section-title" style="margin-top:0;">👤 Profil střelce</div>
+                    <div class="form-grid triple">
+                        <div class="form-group"><label>Jméno a Příjmení</label><input type="text" id="archerName" class="standard-input" placeholder="Ivan Zelenák"></div>
+                        <div class="form-group"><label>Držení</label><select id="archerHand" class="standard-select"><option value="RH">Pravák (RH)</option><option value="LH">Levák (LH)</option></select></div>
+                        <div class="form-group"><label>Divize</label><select id="bowType" class="standard-select"><option value="RL">Reflexní luk</option><option value="KL">Kladkový luk</option><option value="HL">Holý luk</option><option value="TR">Tradiční luk</option></select></div>
+                    </div>
+                    
+                    <div class="form-grid triple">
+                        <div class="form-group">
+                            <label>Skutečná délka nátahu (DL)</label>
+                            <div class="input-group">
+                                <input type="number" step="any" id="drawLength" placeholder="28.0" class="draw-calc-input">
+                                <select id="drawLengthUnit" class="draw-calc-input">
+                                    <option value="palce" selected>palce</option>
+                                    <option value="cm">cm</option>
+                                    <option value="mm">mm</option>
+                                </select>
+                            </div>
+                            <small style="display:block; color:#777; font-size:0.7rem; margin-top:3px; line-height:1.2;">
+                                Měří se přesně od Pivot Pointu po zářez končíku.
+                            </small>
+                        </div>
+                        <div class="form-group">
+                            <label>AMO Standard (DL + Offset)</label>
+                            <div style="display:flex; align-items:center; gap:5px; height: 38px;">
+                                <input type="text" id="amoResult" class="standard-input" readonly style="font-weight:bold; background:#f0f0f0; color:var(--primary-dark); text-align:center;" placeholder="Výsledek">
+                                <div style="font-size:0.8rem; white-space:nowrap; color:#555;">Offset:</div>
+                                <input type="number" step="any" id="amoOffset" value="1.75" class="draw-calc-input" style="width:60px; padding:5px; border:1px solid #ccc; border-radius:4px; text-align:center;">
+                                <div style="font-size:0.8rem; color:#555;">"</div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Skutečná síla (Na prstech)</label>
+                            <div class="input-group">
+                                <input type="number" step="any" id="actualDrawWeight" placeholder="Např. 40.5">
+                                <select id="actualDrawWeightUnit">
+                                    <option value="lbs" selected>lbs</option>
+                                    <option value="kg">kg</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="section-title">📊 Trénink</div>
+                    <div class="form-grid">
+                        <div class="form-group"><label>Datum a Čas</label><div class="date-time-grid"><input type="date" id="date" class="standard-input" required><input type="time" id="time" class="standard-input"></div></div>
+                        <div class="form-group"><label>Typ tréninku</label><select id="trainingType" class="standard-select"><option value="Technika">Technika</option><option value="Objem">Objem</option><option value="Bodování">Bodování</option><option value="Ladění">Ladění</option><option value="Kondice">Kondice</option></select></div>
+                    </div>
+                    <div class="form-grid triple">
+                        <div class="form-group"><label>Vzdálenost (m)</label><input type="number" id="distance" class="standard-input" placeholder="70"></div>
+                        <div class="form-group"><label>Počet šípů</label><input type="number" id="arrowCount" class="standard-input" placeholder="120"></div>
+                        <div class="form-group"><label>Lokalita</label><input type="text" id="location" class="standard-input" placeholder="Střelnice..."></div>
+                    </div>
+
+                    <div class="section-title">🔧 Mířidla</div>
+                    <div class="form-grid triple">
+                        <div class="form-group"><label>Výška (Elev)</label><input type="text" id="sightElevation" class="standard-input" placeholder="5.2"></div>
+                        <div class="form-group"><label>Strana (Wind)</label><input type="text" id="sightWindage" class="standard-input" placeholder="2.4 L"></div>
+                        <div class="form-group"><label>Vysunutí (Ext)</label><input type="text" id="sightExtension" class="standard-input" placeholder="3. díra"></div>
+                    </div>
+
+                    <div class="section-title">⚙️ Nastavení</div>
+                    <div class="form-grid">
+                        <div class="form-group"><label>Lůžko</label><div class="input-group"><input type="number" step="any" id="nockingPoint" placeholder="10"><select id="nockingPointUnit"><option value="mm">mm</option><option value="cm">cm</option></select></div></div>
+                        <div class="form-group">
+                            <label>Centershot</label>
+                            <div class="input-group">
+                                <input type="number" step="any" id="buttonCentershot" placeholder="Např. 11">
+                                <span style="padding:10px;background:#eee;color:#777;font-size:0.8rem;">mm</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-grid">
+                        <div class="form-group"><label>Button (Tuhost)</label><input type="text" id="button" class="standard-input" placeholder="6.5 ot"></div>
+                        <div class="form-group"><label>Clicker</label><input type="text" id="clicker" class="standard-input" placeholder="Pozice"></div>
+                    </div>
+                    
+                    <div class="form-grid">
+                        <div class="form-group"><label>Předpětí (BH)</label><div class="input-group"><input type="number" step="any" id="braceHeight" placeholder="22.5"><select id="braceHeightUnit"><option value="cm">cm</option><option value="mm">mm</option><option value="palce">palce</option></select></div></div>
+                        <div class="form-group"><label>Tiller (H / D)</label><div class="input-group"><input type="text" id="tiller" placeholder="18/18.4"><select id="tillerUnit"><option value="mm">mm</option><option value="cm">cm</option><option value="palce">palce</option></select></div></div>
+                    </div>
+
+                    <div class="form-grid">
+                        <div class="form-group"><label>Horní šroub</label><input type="text" id="tillerBoltTop" class="standard-input" placeholder="Max / 2 ot. ven"></div>
+                        <div class="form-group"><label>Spodní šroub</label><input type="text" id="tillerBoltBottom" class="standard-input" placeholder="Max / 2 ot. ven"></div>
+                    </div>
+                    <div class="form-group"><label>Tětiva</label><input type="text" id="stringInfo" class="standard-input" placeholder="8125, 16 vláken"></div>
+
+                    <div class="section-title">🏹 Výbava</div>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Madlo (Model)</label><input type="text" id="riser" class="standard-input" placeholder="W&W Inno CXT">
+                            <div class="input-group" style="margin-top:5px;"><input type="number" id="riserWeight" class="weight-input" placeholder="Váha"><select id="riserWeightUnit" class="weight-input"><option value="g">g</option><option value="oz">oz</option></select></div>
+                        </div>
+                        <div class="form-group"><label>Délka Madla</label><div class="input-group"><input type="text" id="riserLength" placeholder="25"><select id="riserLengthUnit"><option value="palce">palce</option><option value="cm">cm</option></select></div></div>
+                    </div>
+                    
+                    <div class="form-grid triple">
+                        <div class="form-group"><label>Ramena</label><input type="text" id="limbs" class="standard-input" placeholder="Model"></div>
+                        <div class="form-group">
+                            <label>Váha (1 ks)</label>
+                            <div class="input-group"><input type="number" id="limbWeight" class="weight-input" placeholder="Váha"><select id="limbWeightUnit" class="weight-input"><option value="g">g</option><option value="oz">oz</option></select></div>
+                        </div>
+                        <div class="form-group"><label>Síla Ramen (lbs)</label><input type="number" step="any" id="limbPower" class="standard-input" placeholder="38 lbs"></div>
+                    </div>
+                    
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Mířidla (HW)</label><input type="text" id="sightHwModel" class="standard-input" placeholder="Shibuya">
+                            <div class="input-group" style="margin-top:5px;"><input type="number" id="sightHwWeight" class="weight-input" placeholder="Váha"><select id="sightHwWeightUnit" class="weight-input"><option value="g">g</option><option value="oz">oz</option></select></div>
+                        </div>
+                        <div class="form-group">
+                            <label>Klapačka (HW)</label><input type="text" id="clickerModel" class="standard-input" placeholder="Beiter">
+                            <div class="input-group" style="margin-top:5px;"><input type="number" id="clickerWeight" class="weight-input" placeholder="Váha"><select id="clickerWeightUnit" class="weight-input"><option value="g">g</option><option value="oz">oz</option></select></div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Button (Model)</label><input type="text" id="buttonModel" class="standard-input" placeholder="Beiter">
+                            <div class="input-group" style="margin-top:5px;"><input type="number" id="buttonWeight" class="weight-input" placeholder="Váha"><select id="buttonWeightUnit" class="weight-input"><option value="g">g</option><option value="oz">oz</option></select></div>
+                        </div>
+                        <div class="form-group">
+                             <label>Pružina buttonu</label>
+                            <select id="buttonSpring" class="standard-select">
+                                <option value="">neuvedená</option>
+                                <option value="měkká">měkká</option>
+                                <option value="tvrdá">tvrdá</option>
+                                <option value="extra tvrdá">extra tvrdá</option>
+                            </select>
+                            
+                            <label style="margin-top:8px;">Typ kolíku</label>
+                            <input type="text" id="buttonPin" class="standard-input" placeholder="Délka/Barva a pod.">
+                        </div>
+                    </div>
+
+                    <div class="form-grid"><div class="form-group"><label>Šípy</label><input type="text" id="arrowModel" class="standard-input" placeholder="X10"></div><div class="form-group"><label>Spine</label><input type="text" id="arrowSpine" class="standard-input" placeholder="450"></div></div>
+                    <div class="form-grid"><div class="form-group"><label>Končík</label><input type="text" id="arrowNock" class="standard-input" placeholder="Beiter #1"></div><div class="form-group"><label>Hrot</label><input type="text" id="arrowDetails" class="standard-input" placeholder="120gr"></div></div>
+
+                    <div class="section-title">⚖️ Stabilizátory</div>
+                    
+                    <div class="form-grid">
+                        <div class="stab-container">
+                            <div class="stab-header">Představec</div>
+                            <input type="text" id="extenderModel" class="standard-input" placeholder="Model" style="margin-bottom:5px;">
+                            <div class="input-group"><input type="number" id="extenderWeight" class="weight-input" placeholder="Váha"><select id="extenderWeightUnit" class="weight-input"><option value="g">g</option><option value="oz">oz</option></select></div>
+                        </div>
+                        <div class="stab-container">
+                            <div class="stab-header">V-Bar</div>
+                            <input type="text" id="vbarModel" class="standard-input" placeholder="Model" style="margin-bottom:5px;">
+                            <div class="input-group"><input type="number" id="vbarWeight" class="weight-input" placeholder="Váha"><select id="vbarWeightUnit" class="weight-input"><option value="g">g</option><option value="oz">oz</option></select></div>
+                        </div>
+                    </div>
+
+                    <div class="stab-container" id="stabFrontBlock">
+                        <div class="stab-header">
+                            <span>Přední Stabilizátor</span>
+                            <div class="stab-stats" id="statsFront">
+                                <span>Komp: <b>0.0 g</b></span>
+                                <span>Celk: <b>0.0 g</b></span>
+                            </div>
+                        </div>
+                        <div class="form-grid triple">
+                            <input type="text" class="standard-input stab-model" placeholder="Model">
+                            <div class="input-group"><input type="number" class="stab-len" placeholder="Délka"><select class="stab-len-unit"><option value="palce">palce</option><option value="cm">cm</option></select></div>
+                            <div class="input-group"><input type="number" class="stab-base-weight weight-input" placeholder="Váha tyče"><select class="weight-unit-select weight-input"><option value="g">g</option><option value="oz">oz</option></select></div>
+                        </div>
+                        <table class="comp-table">
+                            <thead><tr><th style="width:10%">Ks</th><th>Typ</th><th style="width:30%">Váha/ks</th><th style="width:10%">Ratio?</th><th style="width:10%"></th></tr></thead>
+                            <tbody></tbody>
+                        </table>
+                        <button type="button" class="btn-add-row" onclick="addStabRow(this)">[+] Přidat komponentu</button>
+                    </div>
+
+                    <div class="stab-container" id="stabLeftBlock">
+                        <div class="stab-header">
+                            <span>Levý Stabilizátor</span>
+                            <div class="stab-stats" id="statsLeft">
+                                <span>Komp: <b>0.0 g</b></span>
+                                <span>Celk: <b>0.0 g</b></span>
+                            </div>
+                        </div>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Horizontální úhel</label>
+                                <div class="input-group"><input type="number" class="stab-ang-hor" placeholder="0"><span style="padding:10px;background:#eee;color:#777;font-size:0.8rem;">°</span></div>
+                            </div>
+                            <div class="form-group">
+                                <label>Vertikální úhel</label>
+                                <div class="input-group"><input type="number" class="stab-ang-ver" placeholder="0"><span style="padding:10px;background:#eee;color:#777;font-size:0.8rem;">°</span></div>
+                            </div>
+                        </div>
+                        <div class="form-grid triple">
+                            <input type="text" class="standard-input stab-model" placeholder="Model">
+                            <div class="input-group"><input type="number" class="stab-len" placeholder="Délka"><select class="stab-len-unit"><option value="palce">palce</option><option value="cm">cm</option></select></div>
+                            <div class="input-group"><input type="number" class="stab-base-weight weight-input" placeholder="Váha tyče"><select class="weight-unit-select weight-input"><option value="g">g</option><option value="oz">oz</option></select></div>
+                        </div>
+                        <table class="comp-table"><thead><tr><th>Ks</th><th>Typ</th><th>Váha/ks</th><th>Ratio?</th><th></th></tr></thead><tbody></tbody></table>
+                        <button type="button" class="btn-add-row" onclick="addStabRow(this)">[+] Přidat komponentu</button>
+                    </div>
+
+                    <div class="stab-container" id="stabRightBlock">
+                        <div class="stab-header">
+                            <span>Pravý Stabilizátor</span>
+                            <div class="stab-stats" id="statsRight">
+                                <span>Komp: <b>0.0 g</b></span>
+                                <span>Celk: <b>0.0 g</b></span>
+                            </div>
+                        </div>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Horizontální úhel</label>
+                                <div class="input-group"><input type="number" class="stab-ang-hor" placeholder="0"><span style="padding:10px;background:#eee;color:#777;font-size:0.8rem;">°</span></div>
+                            </div>
+                            <div class="form-group">
+                                <label>Vertikální úhel</label>
+                                <div class="input-group"><input type="number" class="stab-ang-ver" placeholder="0"><span style="padding:10px;background:#eee;color:#777;font-size:0.8rem;">°</span></div>
+                            </div>
+                        </div>
+                        <div class="form-grid triple">
+                            <input type="text" class="standard-input stab-model" placeholder="Model">
+                            <div class="input-group"><input type="number" class="stab-len" placeholder="Délka"><select class="stab-len-unit"><option value="palce">palce</option><option value="cm">cm</option></select></div>
+                            <div class="input-group"><input type="number" class="stab-base-weight weight-input" placeholder="Váha tyče"><select class="weight-unit-select weight-input"><option value="g">g</option><option value="oz">oz</option></select></div>
+                        </div>
+                        <table class="comp-table"><thead><tr><th>Ks</th><th>Typ</th><th>Váha/ks</th><th>Ratio?</th><th></th></tr></thead><tbody></tbody></table>
+                        <button type="button" class="btn-add-row" onclick="addStabRow(this)">[+] Přidat komponentu</button>
+                    </div>
+
+                    <div class="system-summary">
+                        <div class="summary-header">Celková hmotnost kompletního luku</div>
+                        <div class="summary-row"><span>Madlo</span><span id="sumRiser">0.0 g</span></div>
+                        <div class="summary-row"><span>Ramena (2x)</span><span id="sumLimbs">0.0 g</span></div>
+                        <div class="summary-row"><span>Mířidla</span><span id="sumSight">0.0 g</span></div>
+                        <div class="summary-row"><span>Klapačka</span><span id="sumClicker">0.0 g</span></div>
+                        <div class="summary-row"><span>Button</span><span id="sumButton">0.0 g</span></div>
+                        <div class="summary-row"><span>Přední stab. (komplet)</span><span id="sumFront">0.0 g</span></div>
+                        <div class="summary-row"><span>Levý stab. (komplet)</span><span id="sumLeft">0.0 g</span></div>
+                        <div class="summary-row"><span>Pravý stab. (komplet)</span><span id="sumRight">0.0 g</span></div>
+                        <div class="summary-row"><span>V-Bar</span><span id="sumVbar">0.0 g</span></div>
+                        <div class="summary-row"><span>Představec</span><span id="sumExt">0.0 g</span></div>
+                        <div class="summary-row total"><span>CELKEM</span><span id="sumTotalBow">0.0 g</span></div>
+                    </div>
+
+                    <div class="ratio-section">
+                        <div class="ratio-title">Vyvážení (Závaží v poměru)</div>
+                        <div class="ratio-grid">
+                            <div class="ratio-box"><label>Předek (Components)</label><div class="ratio-val" id="ratioFrontVal">0.0 g</div></div>
+                            <div class="ratio-box"><label>Zadek (L+R Components)</label><div class="ratio-val" id="ratioSideVal">0.0 g</div></div>
+                            <div class="ratio-result">
+                                <label style="display:block;margin-bottom:5px;">POMĚR (Předek : Zadek)</label>
+                                <strong id="sysRatio">- : -</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-top:15px;"><label>Poznámky</label><textarea id="notes" rows="3" placeholder="Poznámky..."></textarea></div>
+
+                    <button type="submit" id="submitBtn" class="btn">Uložit Záznam</button>
+                    <button type="button" id="cancelEditBtn" class="btn btn-cancel-edit" onclick="cancelEdit()">❌ Zrušit úpravu</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="stats-bar" style="text-align:center; margin:20px 0; color:#7f8c8d; font-size:0.9rem;"><span id="total-entries">0 Záznamů</span></div>
+        <div id="entriesList"></div>
+    </div>
+
+    <div id="view-backup" class="view-section">
+        <div class="backup-page-content">
+            <h2 class="info-heading">Záloha a Obnova Dat</h2>
+            <p class="info-text">
+                Tato sekce slouží ke správě vašich dat. Protože Archery Log neodesílá žádná data na internet, je důležité si pravidelně vytvářet zálohu (Export), zejména pokud plánujete promazat historii prohlížeče nebo měníte telefon.
+            </p>
+            <div class="info-text" style="background:#e9f5db; padding:15px; border-radius:6px; border-left:4px solid var(--primary-color);">
+                <strong>Tip:</strong> Vyexportovaný soubor (JSON) si můžete poslat na email nebo uložit na Google Drive, abyste o svá data nepřišli.
+            </div>
+            
+            <div class="backup-controls-panel">
+                <button class="btn-backup-large" onclick="exportData()">
+                    💾 Vytvořit zálohu (Export)
+                </button>
+                <button class="btn-backup-large" onclick="document.getElementById('importFile').click()">
+                    📂 Nahrát zálohu (Import)
+                </button>
+                <input type="file" id="importFile" style="display: none;" onchange="importData(this)">
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // --- MENU & VIEW LOGIC ---
+    function toggleMenu() {
+        const menu = document.getElementById('navDropdown');
+        menu.classList.toggle('active');
+    }
+
+    // Close menu when clicking outside
+    document.addEventListener('click', function(event) {
+        const menu = document.getElementById('navDropdown');
+        const hamburger = document.querySelector('.hamburger-btn');
+        if (!menu.contains(event.target) && !hamburger.contains(event.target)) {
+            menu.classList.remove('active');
+        }
+    });
+
+    function switchView(viewName, linkElement) {
+        // Hide all views
+        document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active-view'));
+        
+        // Show target view
+        document.getElementById('view-' + viewName).classList.add('active-view');
+        
+        // Update active link state
+        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active-link'));
+        if(linkElement) linkElement.classList.add('active-link');
+        
+        // Close menu
+        document.getElementById('navDropdown').classList.remove('active');
+        
+        // Calculate stats if opening stats view
+        if(viewName === 'stats') {
+            renderStats();
+        }
+    }
+    
+    // --- STATS CALCULATION ---
+    function renderStats() {
+        const entries = getEntries();
+        const container = document.getElementById('statsContent');
+        
+        if(!entries.length) {
+            container.innerHTML = '<div style="text-align:center; padding:30px; color:#777;">Zatím nejsou k dispozici žádná data pro statistiku.</div>';
+            return;
+        }
+        
+        // 1. Weekly Volume
+        const now = new Date();
+        const startOfWeek = new Date(now);
+        startOfWeek.setDate(now.getDate() - now.getDay() + (now.getDay() === 0 ? -6 : 1)); // Monday
+        startOfWeek.setHours(0,0,0,0);
+        
+        const startOfLastWeek = new Date(startOfWeek);
+        startOfLastWeek.setDate(startOfLastWeek.getDate() - 7);
+        
+        let thisWeekArrows = 0;
+        let lastWeekArrows = 0;
+        
+        entries.forEach(e => {
+            const d = new Date(e.date);
+            const arrows = parseInt(e.arrowCount) || 0;
+            if(d >= startOfWeek) thisWeekArrows += arrows;
+            else if(d >= startOfLastWeek && d < startOfWeek) lastWeekArrows += arrows;
+        });
+        
+        let trend = '';
+        if(thisWeekArrows > lastWeekArrows) trend = '<span class="trend-up">⬆️</span>';
+        else if(thisWeekArrows < lastWeekArrows) trend = '<span class="trend-down">⬇️</span>';
+        else trend = '<span>➡️</span>';
+        
+        // 2. String Odometer
+        const currentString = entries[0].stringInfo || 'Neuvedeno';
+        let stringCount = 0;
+        for(let e of entries) {
+            if(e.stringInfo === currentString) stringCount += (parseInt(e.arrowCount) || 0);
+            else break; // Stop when string name changes
+        }
+        
+        // 3. BH Check
+        let bhAlert = '';
+        if(entries.length >= 2) {
+            const cur = entries[0];
+            const prev = entries[1];
+            if(cur.braceHeight && prev.braceHeight && cur.braceHeightUnit === prev.braceHeightUnit) {
+                const diff = Math.abs(parseFloat(cur.braceHeight) - parseFloat(prev.braceHeight));
+                // Threshold: 0.2 cm/inch or 2 mm
+                const threshold = cur.braceHeightUnit === 'mm' ? 2 : 0.2;
+                if(diff >= threshold) {
+                    bhAlert = `<div class="alert-box">⚠️ <strong>Změna BH!</strong> Tvé předpětí se změnilo o ${diff.toFixed(1)} ${cur.braceHeightUnit} oproti minulému tréninku. Zkontroluj protažení tětivy.</div>`;
+                }
+            }
+        }
+        
+        // 4. Avg Sight 70m
+        let sum70 = 0;
+        let count70 = 0;
+        entries.forEach(e => {
+            if(parseInt(e.distance) === 70 && e.sightElevation) {
+                // Try to parse "5.2" or "5,2"
+                let val = parseFloat(e.sightElevation.replace(',','.'));
+                if(!isNaN(val)) {
+                    sum70 += val;
+                    count70++;
+                }
+            }
+        });
+        const avg70 = count70 > 0 ? (sum70 / count70).toFixed(2) : '-';
+
+        // HTML Output
+        container.innerHTML = `
+            <div class="stat-grid">
+                <div class="stat-card">
+                    <div class="stat-header">Objem (Tento týden)</div>
+                    <div class="stat-value-big">${thisWeekArrows} ${trend}</div>
+                    <div class="stat-subtext">Minulý týden: ${lastWeekArrows}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-header">Tětiva (Odometer)</div>
+                    <div class="stat-value-big">${stringCount}</div>
+                    <div class="stat-subtext">${currentString}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-header">Průměrná Mířidla (70m)</div>
+                    <div class="stat-value-big">${avg70}</div>
+                    <div class="stat-subtext">Zprůměrováno z ${count70} záznamů</div>
+                </div>
+            </div>
+            ${bhAlert}
+        `;
+    }
+
+    // --- EXISTING APP LOGIC ---
+    const form = document.getElementById('archeryForm');
+    const entriesList = document.getElementById('entriesList');
+    const sightTableBody = document.getElementById('sightTableBody');
+    const submitBtn = document.getElementById('submitBtn');
+    const cancelEditBtn = document.getElementById('cancelEditBtn');
+    const mainCard = document.getElementById('mainCard');
+    const editIdInput = document.getElementById('editId');
+    const archerNameInput = document.getElementById('archerName');
+    const archerBowTypeInput = document.getElementById('bowType');
+    const mainTitle = document.getElementById('mainTitle');
+
+    const STORAGE_KEY_DATA = 'elite_archery_log_v16'; 
+    const TRACKED_DISTANCES = [5, 10, 15, 18, 20, 25, 30, 40, 50, 60, 70, 90];
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // Načte data, nastaví "teď" a vypočítá hodnoty
+        loadDefaults(); 
+        setNow(); 
+        renderEntries(); 
+        updateTitle(); 
+        calcWeights(); 
+        calcAMO();
+        
+        document.addEventListener('input', e => { 
+            if(e.target.classList.contains('weight-input')) calcWeights();
+            if(e.target.classList.contains('draw-calc-input')) calcAMO();
+        });
+        document.addEventListener('change', e => { 
+            if(e.target.classList.contains('weight-input') || e.target.classList.contains('comp-ratio')) calcWeights(); 
+            if(e.target.classList.contains('draw-calc-input')) calcAMO();
+        });
+    });
+
+    archerNameInput.addEventListener('input', updateTitle);
+    archerBowTypeInput.addEventListener('change', updateTitle);
+
+    function updateTitle() {
+        const name = archerNameInput.value.trim();
+        const divAbbr = archerBowTypeInput.value; 
+        mainTitle.textContent = name ? `${name} (${divAbbr}) - Archery Log` : "Archery Log";
+    }
+
+    function setNow() {
+        const now = new Date();
+        document.getElementById('date').valueAsDate = now;
+        document.getElementById('time').value = now.toTimeString().substring(0,5);
+    }
+    
+    // --- DRAW LENGTH CALCULATOR ---
+    window.calcAMO = function() {
+        const val = parseFloat(document.getElementById('drawLength').value) || 0;
+        const unit = document.getElementById('drawLengthUnit').value;
+        const offset = parseFloat(document.getElementById('amoOffset').value) || 1.75;
+        
+        if(val === 0) {
+            document.getElementById('amoResult').value = '';
+            return;
+        }
+        
+        // Normalize to inches for AMO calculation (standard is inches)
+        let valInInches = val;
+        if(unit === 'cm') valInInches = val / 2.54;
+        if(unit === 'mm') valInInches = val / 25.4;
+        
+        const amo = valInInches + offset;
+        document.getElementById('amoResult').value = amo.toFixed(2) + '"';
+    }
+
+    // --- DYNAMIC STABILIZER ROWS ---
+    window.addStabRow = function(btn) {
+        const tbody = btn.previousElementSibling.querySelector('tbody');
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td><input type="number" class="comp-count weight-input" value="1" min="1"></td>
+            <td><input type="text" class="comp-type" placeholder="Závaží"></td>
+            <td>
+                <div class="table-input-group">
+                    <input type="number" class="comp-weight weight-input" placeholder="0">
+                    <select class="comp-unit weight-input"><option value="g">g</option><option value="oz">oz</option></select>
+                </div>
+            </td>
+            <td style="text-align:center;"><input type="checkbox" class="comp-ratio" checked></td>
+            <td><button type="button" class="btn-remove-row" onclick="removeStabRow(this)">×</button></td>
+        `;
+        tbody.appendChild(row);
+    }
+
+    window.removeStabRow = function(btn) { btn.closest('tr').remove(); calcWeights(); }
+
+    // --- WEIGHT CALCULATION LOGIC ---
+    window.calcWeights = function() {
+        const toGrams = (val, unit) => unit === 'oz' ? val * 28.3495 : val;
+        const fmt = (val) => val.toFixed(1) + ' g';
+        
+        const getWeightFromGroup = (idPrefix) => {
+            const valInput = document.getElementById(idPrefix+'Weight');
+            const unitSelect = document.getElementById(idPrefix+'WeightUnit');
+            if (!valInput || !unitSelect) return 0;
+            const val = parseFloat(valInput.value) || 0;
+            return toGrams(val, unitSelect.value);
+        }
+
+        const getBlockStats = (blockId) => {
+            const block = document.getElementById(blockId);
+            if(!block) return { total: 0, comps: 0, ratioPart: 0 };
+            
+            const baseVal = parseFloat(block.querySelector('.stab-base-weight').value) || 0;
+            const baseUnit = block.querySelector('.stab-base-weight + select').value;
+            let baseTotal = toGrams(baseVal, baseUnit);
+            let compsTotal = 0;
+            let ratioPart = 0;
+            
+            block.querySelectorAll('tbody tr').forEach(row => {
+                const count = parseFloat(row.querySelector('.comp-count').value) || 0;
+                const w = parseFloat(row.querySelector('.comp-weight').value) || 0;
+                const u = row.querySelector('.comp-unit').value;
+                const inRatio = row.querySelector('.comp-ratio').checked;
+                
+                const lineWeight = count * toGrams(w, u);
+                compsTotal += lineWeight;
+                if(inRatio) ratioPart += lineWeight;
+            });
+            return { total: baseTotal + compsTotal, comps: compsTotal, ratioPart };
+        };
+
+        const wRiser = getWeightFromGroup('riser');
+        const wSight = getWeightFromGroup('sightHw');
+        const wClicker = getWeightFromGroup('clicker');
+        const wButton = getWeightFromGroup('button');
+        const wExt = getWeightFromGroup('extender');
+        const wVbar = getWeightFromGroup('vbar');
+        const wLimbSingle = getWeightFromGroup('limb');
+        const wLimbsTotal = wLimbSingle * 2;
+
+        const sFront = getBlockStats('stabFrontBlock');
+        const sLeft = getBlockStats('stabLeftBlock');
+        const sRight = getBlockStats('stabRightBlock');
+
+        // Update Headers with Dual Sums
+        document.getElementById('statsFront').innerHTML = `<span>Komp: <b>${fmt(sFront.comps)}</b></span><span>Celk: <b>${fmt(sFront.total)}</b></span>`;
+        document.getElementById('statsLeft').innerHTML = `<span>Komp: <b>${fmt(sLeft.comps)}</b></span><span>Celk: <b>${fmt(sLeft.total)}</b></span>`;
+        document.getElementById('statsRight').innerHTML = `<span>Komp: <b>${fmt(sRight.comps)}</b></span><span>Celk: <b>${fmt(sRight.total)}</b></span>`;
+
+        // Summary
+        document.getElementById('sumRiser').textContent = fmt(wRiser);
+        document.getElementById('sumLimbs').textContent = fmt(wLimbsTotal);
+        document.getElementById('sumSight').textContent = fmt(wSight);
+        document.getElementById('sumClicker').textContent = fmt(wClicker);
+        document.getElementById('sumButton').textContent = fmt(wButton);
+        document.getElementById('sumFront').textContent = fmt(sFront.total);
+        document.getElementById('sumLeft').textContent = fmt(sLeft.total);
+        document.getElementById('sumRight').textContent = fmt(sRight.total);
+        document.getElementById('sumVbar').textContent = fmt(wVbar);
+        document.getElementById('sumExt').textContent = fmt(wExt);
+
+        const grandTotal = wRiser + wLimbsTotal + wSight + wClicker + wButton + wExt + wVbar + sFront.total + sLeft.total + sRight.total;
+        document.getElementById('sumTotalBow').textContent = fmt(grandTotal);
+
+        // Ratio
+        const ratioFront = sFront.ratioPart;
+        const ratioSide = sLeft.ratioPart + sRight.ratioPart;
+        
+        document.getElementById('ratioFrontVal').textContent = fmt(ratioFront);
+        document.getElementById('ratioSideVal').textContent = fmt(ratioSide);
+
+        if (ratioFront > 0) {
+            let ratioVal = (ratioSide / ratioFront).toFixed(2);
+            document.getElementById('sysRatio').textContent = `1 : ${ratioVal}`;
+        } else {
+            document.getElementById('sysRatio').textContent = `- : -`;
+        }
+    }
+
+    // --- DATA HELPERS ---
+    function getStabData(blockId) {
+        const block = document.getElementById(blockId);
+        const rows = [];
+        block.querySelectorAll('tbody tr').forEach(r => {
+            rows.push({
+                count: r.querySelector('.comp-count').value,
+                type: r.querySelector('.comp-type').value,
+                weight: r.querySelector('.comp-weight').value,
+                unit: r.querySelector('.comp-unit').value,
+                inRatio: r.querySelector('.comp-ratio').checked
+            });
+        });
+        
+        const angH = block.querySelector('.stab-ang-hor')?.value || '';
+        const angV = block.querySelector('.stab-ang-ver')?.value || '';
+
+        return {
+            model: block.querySelector('.stab-model').value,
+            len: block.querySelector('.stab-len').value,
+            lenUnit: block.querySelector('.stab-len-unit').value,
+            baseWeight: block.querySelector('.stab-base-weight').value,
+            baseUnit: block.querySelector('.stab-base-weight + select').value,
+            angH: angH,
+            angV: angV,
+            components: rows
+        };
+    }
+
+    function setStabData(blockId, data) {
+        if(!data) return;
+        const block = document.getElementById(blockId);
+        block.querySelector('.stab-model').value = data.model || '';
+        block.querySelector('.stab-len').value = data.len || '';
+        block.querySelector('.stab-len-unit').value = data.lenUnit || 'palce';
+        block.querySelector('.stab-base-weight').value = data.baseWeight || '';
+        block.querySelector('.stab-base-weight + select').value = data.baseUnit || 'g';
+        
+        if(block.querySelector('.stab-ang-hor')) block.querySelector('.stab-ang-hor').value = data.angH || '';
+        if(block.querySelector('.stab-ang-ver')) block.querySelector('.stab-ang-ver').value = data.angV || '';
+        
+        const tbody = block.querySelector('tbody');
+        tbody.innerHTML = '';
+        if(data.components) {
+            data.components.forEach(c => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><input type="number" class="comp-count weight-input" value="${c.count}"></td>
+                    <td><input type="text" class="comp-type" value="${c.type}"></td>
+                    <td>
+                        <div class="table-input-group">
+                            <input type="number" class="comp-weight weight-input" value="${c.weight}">
+                            <select class="comp-unit weight-input"><option value="g" ${c.unit=='g'?'selected':''}>g</option><option value="oz" ${c.unit=='oz'?'selected':''}>oz</option></select>
+                        </div>
+                    </td>
+                    <td style="text-align:center;"><input type="checkbox" class="comp-ratio" ${c.inRatio !== false ? 'checked' : ''}></td>
+                    <td><button type="button" class="btn-remove-row" onclick="removeStabRow(this)">×</button></td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+    }
+
+    // --- FORM HANDLING ---
+    form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        try {
+            const formData = {};
+            for(let el of form.elements) { if(el.id) formData[el.id] = el.value; }
+
+            // Robust getWG with explicit IDs
+            const getWG = (id) => {
+                const w = document.getElementById(id+'Weight');
+                const u = document.getElementById(id+'WeightUnit');
+                const m = document.getElementById(id+'Model') || document.getElementById(id); // fallback for 'riser' vs 'riserModel'
+                return { 
+                    val: w ? w.value : '', 
+                    unit: u ? u.value : 'g',
+                    model: m ? m.value : ''
+                };
+            };
+
+            const stabPayload = {
+                front: getStabData('stabFrontBlock'),
+                left: getStabData('stabLeftBlock'),
+                right: getStabData('stabRightBlock'),
+                extender: getWG('extender'),
+                vbar: getWG('vbar'),
+                totals: { 
+                    totalBow: document.getElementById('sumTotalBow').textContent, 
+                    ratio: document.getElementById('sysRatio').textContent 
+                }
+            };
+            
+            const equipWeights = {
+                riser: getWG('riser'),
+                sight: getWG('sightHw'),
+                clicker: getWG('clicker'),
+                button: getWG('button'),
+                limb: getWG('limb')
+            };
+
+            const newEntry = { id: Date.now(), ...formData, stabilizers: stabPayload, equipWeights: equipWeights };
+            let entries = getEntries();
+            if (editIdInput.value) {
+                const idx = entries.findIndex(x => x.id == editIdInput.value);
+                if (idx !== -1) entries[idx] = { ...newEntry, id: parseInt(editIdInput.value) };
+            } else { entries.unshift(newEntry); }
+            
+            localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(entries));
+            
+            alert('Uloženo!'); 
+            renderEntries(); 
+            // Po uložení resetujeme formulář a znovu načteme defaulty (poslední záznam), ale s čistým datem
+            cancelEdit(); 
+        } catch(err) {
+            alert('Chyba při ukládání: ' + err.message);
+            console.error(err);
+        }
+    });
+
+    function getEntries() { 
+        try {
+            return JSON.parse(localStorage.getItem(STORAGE_KEY_DATA) || '[]'); 
+        } catch(e) { return []; }
+    }
+
+    // --- AUTO-FILL FROM HISTORY (OPRAVENO) ---
+    function loadDefaults() {
+        try {
+            const entries = getEntries();
+            const lastEntry = entries.length > 0 ? entries[0] : null;
+
+            if (lastEntry) {
+                // Seznam polí, která se NESMÍ vyplnit automaticky (mají být prázdná pro nový trénink)
+                const skip = ['id', 'date', 'time', 'notes', 'arrowCount', 'distance', 'trainingType', 'location'];
+                
+                // 1. Vyplnění jednoduchých inputů
+                for(let k in lastEntry) {
+                    if(skip.includes(k)) continue; // Přeskoč datum, čas, počet šípů...
+                    const el = document.getElementById(k);
+                    // Vyplňujeme jen pokud nejsme v režimu editace existujícího záznamu
+                    if(el && !editIdInput.value) el.value = lastEntry[k];
+                }
+
+                // Pomocná funkce pro vyplnění vah a modelů
+                const setWG = (id, obj) => {
+                    if (obj) {
+                        const w = document.getElementById(id + 'Weight');
+                        const u = document.getElementById(id + 'WeightUnit');
+                        const m = document.getElementById(id + 'Model') || document.getElementById(id);
+                        if (w) w.value = obj.val || '';
+                        if (u) u.value = obj.unit || 'g';
+                        if (m) m.value = obj.model || '';
+                    }
+                };
+
+                // 2. Vyplnění vah výbavy
+                if(lastEntry.equipWeights && !editIdInput.value) {
+                    const eq = lastEntry.equipWeights;
+                    setWG('riser', eq.riser);
+                    setWG('sightHw', eq.sight);
+                    setWG('clicker', eq.clicker);
+                    setWG('button', eq.button);
+                    setWG('limb', eq.limb);
+                }
+
+                // 3. Vyplnění stabilizátorů (včetně tabulek)
+                if(lastEntry.stabilizers && !editIdInput.value) {
+                    const st = lastEntry.stabilizers;
+                    setStabData('stabFrontBlock', st.front);
+                    setStabData('stabLeftBlock', st.left);
+                    setStabData('stabRightBlock', st.right);
+                    setWG('extender', st.extender);
+                    setWG('vbar', st.vbar);
+                }
+                
+                // Přepočítat ihned po načtení
+                calcWeights();
+                calcAMO();
+            }
+        } catch(e) { console.error("Error autofilling:", e); }
+    }
+
+    // --- EDIT & DELETE ---
+    window.editEntry = function(id) {
+        switchView('log'); 
+        const entry = getEntries().find(x => x.id === id);
+        if(!entry) return;
+        
+        // Fill basic fields
+        for(let k in entry) { const el = document.getElementById(k); if(el) el.value = entry[k]; }
+        
+        const setWG = (id, obj) => { 
+            if (obj) {
+                const w = document.getElementById(id + 'Weight');
+                const u = document.getElementById(id + 'WeightUnit');
+                const m = document.getElementById(id + 'Model') || document.getElementById(id);
+                if (w) w.value = obj.val || '';
+                if (u) u.value = obj.unit || 'g';
+                if (m) m.value = obj.model || '';
+            }
+        };
+
+        if(entry.equipWeights) {
+            setWG('riser', entry.equipWeights.riser);
+            setWG('sightHw', entry.equipWeights.sight);
+            setWG('clicker', entry.equipWeights.clicker);
+            setWG('button', entry.equipWeights.button);
+            setWG('limb', entry.equipWeights.limb);
+        }
+
+        if(entry.stabilizers) {
+            setStabData('stabFrontBlock', entry.stabilizers.front);
+            setStabData('stabLeftBlock', entry.stabilizers.left);
+            setStabData('stabRightBlock', entry.stabilizers.right);
+            setWG('extender', entry.stabilizers.extender);
+            setWG('vbar', entry.stabilizers.vbar);
+        }
+
+        editIdInput.value = id;
+        submitBtn.textContent = "💾 Aktualizovat záznam";
+        submitBtn.classList.add('btn-update');
+        cancelEditBtn.style.display = 'block';
+        mainCard.classList.add('editing-mode');
+        calcWeights(); calcAMO(); mainCard.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    window.cancelEdit = function() {
+        editIdInput.value = ''; 
+        form.reset(); 
+        
+        // Znovu načíst poslední data (jako šablonu) a nastavit dnešní datum
+        loadDefaults(); 
+        setNow();
+        
+        submitBtn.textContent = "Uložit Záznam";
+        submitBtn.classList.remove('btn-update');
+        cancelEditBtn.style.display = 'none';
+        mainCard.classList.remove('editing-mode');
+    }
+
+    window.deleteEntry = function(id) {
+        if(confirm('Smazat?')) {
+            let es = getEntries().filter(x => x.id !== id);
+            localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(es));
+            if(editIdInput.value == id) cancelEdit();
+            renderEntries();
+        }
+    }
+
+    // --- TOGGLE HISTORY ---
+    window.toggleEntry = function(header) {
+        header.closest('.entry-item').classList.toggle('expanded');
+    }
+
+    // --- EXPORT/IMPORT ---
+    window.exportData = function() {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({version:"v16", data:getEntries()}));
+        const a = document.createElement('a'); a.href = dataStr; a.download = `ArcheryLog_${new Date().toISOString().split('T')[0]}.json`; a.click();
+    }
+    window.importData = function(input) {
+        const f = input.files[0]; if(!f) return;
+        const r = new FileReader();
+        r.onload = e => {
+            try {
+                const c = JSON.parse(e.target.result);
+                if(c.data) { localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(c.data)); renderEntries(); alert('Data nahrána.'); loadDefaults(); }
+            } catch(x) { alert('Chyba.'); }
+        }; r.readAsText(f); input.value = '';
+    }
+
+    // --- RENDER ---
+    function renderEntries() {
+        const entries = getEntries();
+        let sightHtml = '', bestMarks = {};
+        entries.forEach(e => { let d = parseInt(e.distance); if(TRACKED_DISTANCES.includes(d) && !bestMarks[d] && (e.sightElevation || e.sightWindage)) bestMarks[d] = e; });
+        TRACKED_DISTANCES.forEach(d => { if(bestMarks[d]) { let e = bestMarks[d]; sightHtml += `<tr><td class="dist-cell">${d}</td><td style="font-weight:bold">${e.sightElevation||'-'} / ${e.sightWindage||'-'}</td><td style="font-size:0.75rem">${new Date(e.date).getDate()}.${new Date(e.date).getMonth()+1}.</td></tr>`; } });
+        sightTableBody.innerHTML = sightHtml || '<tr><td colspan="3" style="color:#999;padding:10px;">Žádná data.</td></tr>';
+        document.getElementById('total-entries').textContent = `${entries.length} Záznamů`;
+
+        if(!entries.length) { entriesList.innerHTML = '<div style="text-align:center; color:#95a5a6; padding:30px;">Žádná historie.</div>'; return; }
+
+        entriesList.innerHTML = entries.map(e => {
+            const dateStr = `${new Date(e.date).getDate()}.${new Date(e.date).getMonth()+1}.${new Date(e.date).getFullYear()}`;
+            const createBlock = (l,v,u) => `<div class="data-item"><span class="data-label">${l}</span><div class="data-val">${v || '-'} ${u?`<small>${u}</small>`:''}</div></div>`;
+            
+            let stabSummary = '';
+            if(e.stabilizers) {
+                const s = e.stabilizers;
+                const showAng = (h,v) => (h || v) ? `(H:${h}° V:${v}°)` : '';
+                stabSummary = `
+                <div class="info-block"><div class="block-title">⚖️ Hmotnost & Poměr (${s.totals?.totalBow || '?'} | ${s.totals?.ratio || '-'})</div>
+                <div class="data-grid" style="grid-template-columns:1fr;">
+                    <div style="font-size:0.8rem; padding:5px;">
+                        <div><b>Přední:</b> ${s.front.len} ${s.front.lenUnit}, ${s.front.model}</div>
+                        <div><b>Levý:</b> ${s.left.len} ${s.left.lenUnit} ${showAng(s.left.angH, s.left.angV)}</div>
+                        <div><b>Pravý:</b> ${s.right.len} ${s.right.lenUnit} ${showAng(s.right.angH, s.right.angV)}</div>
+                    </div>
+                </div></div>`;
+            }
+
+            let sightHeader = '';
+            if(e.sightElevation || e.sightWindage) {
+                sightHeader = `<div class="badge badge-sight"><b>${e.sightElevation || '-'}</b> / ${e.sightWindage || '-'}</div>`;
+            }
+
+            return `
+            <div class="entry-item">
+                <div class="entry-top" onclick="toggleEntry(this)">
+                    <div class="entry-main-info">
+                        <div class="entry-date">${dateStr}</div>
+                        <div class="entry-badges">
+                            <span class="badge badge-type">${e.trainingType}</span>
+                            <span class="badge badge-dist">${e.distance}m</span>
+                            <span class="badge badge-arrows">${e.arrowCount} š.</span>
+                            ${sightHeader}
+                        </div>
+                    </div>
+                    <div class="entry-toggle-icon">▼</div>
+                    <div class="entry-actions">
+                        <button class="btn-icon" onclick="event.stopPropagation(); editEntry(${e.id})" title="Upravit">✏️</button>
+                        <button class="btn-icon" onclick="event.stopPropagation(); deleteEntry(${e.id})" style="color:red;">🗑️</button>
+                    </div>
+                </div>
+                <div class="entry-body">
+                    <div class="info-block"><div class="block-title">🔧 Mířidla Detail</div><div class="data-grid">
+                        ${createBlock('Výška', e.sightElevation)} ${createBlock('Strana', e.sightWindage)} ${createBlock('Ext', e.sightExtension)} ${createBlock('Lokalita', e.location)}
+                    </div></div>
+                    
+                    <div class="info-block"><div class="block-title">⚙️ Nastavení</div><div class="data-grid">
+                        ${createBlock('DL', e.drawLength, e.drawLengthUnit)} ${createBlock('AMO', e.amoResult)} 
+                        ${createBlock('Síla (Prsty)', e.actualDrawWeight, e.actualDrawWeightUnit)}
+                        ${createBlock('BH', e.braceHeight, e.braceHeightUnit)} ${createBlock('Tiller', e.tiller, e.tillerUnit)} 
+                        ${createBlock('Lůžko', e.nockingPoint, e.nockingPointUnit)} ${createBlock('Centershot', e.buttonCentershot, 'mm')}
+                        ${createBlock('Button', e.button)} ${createBlock('Clicker', e.clicker)}
+                        ${createBlock('Tiller H', e.tillerBoltTop)} ${createBlock('Tiller D', e.tillerBoltBottom)}
+                    </div></div>
+                    
+                    <div class="info-block"><div class="block-title">🏹 Výbava</div><div class="data-grid">
+                        ${createBlock('Madlo', e.riser + (e.equipWeights?.riser.val ? ` (${e.equipWeights.riser.val} ${e.equipWeights.riser.unit})` : ''))}
+                        ${createBlock('Ramena', e.limbs)}
+                        ${createBlock('Síla (Značená)', e.limbPower, 'lbs')}
+                        ${createBlock('Mířidla HW', e.sightHwModel + (e.equipWeights?.sight.val ? ` (${e.equipWeights.sight.val} ${e.equipWeights.sight.unit})` : ''))}
+                        ${createBlock('Klapačka HW', e.clickerModel + (e.equipWeights?.clicker.val ? ` (${e.equipWeights.clicker.val} ${e.equipWeights.clicker.unit})` : ''))}
+                        ${createBlock('Button Model', e.buttonModel + (e.equipWeights?.button.val ? ` (${e.equipWeights.button.val} ${e.equipWeights.button.unit})` : ''))}
+                        ${createBlock('Pružina', e.buttonSpring)}
+                        ${createBlock('Kolík', e.buttonPin)}
+                        ${createBlock('Šípy', e.arrowModel)}
+                        ${createBlock('Spine', e.arrowSpine)}
+                        ${createBlock('Hrot', e.arrowDetails)}
+                        ${createBlock('Končík', e.arrowNock)}
+                        ${createBlock('Tětiva', e.stringInfo)}
+                    </div></div>
+                    
+                    ${stabSummary}
+                    ${e.notes ? `<div class="note-box">${e.notes}</div>` : ''}
+                </div>
+            </div>`;
+        }).join('');
+    }
+</script>
+</body>
+</html>
